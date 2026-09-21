@@ -1,0 +1,13 @@
+spi:
+  - id: display_spi
+    type: quad
+    clk_pin: GPIO47
+    data_pins: [GPIO21, GPIO48, GPIO40, GPIO39]
+
+display:
+  - platform: mipi_spi
+    id: display_panel
+    model: JC4827W543
+    spi_id: display_spi
+    invert_colors: true
+    show_test_card: false

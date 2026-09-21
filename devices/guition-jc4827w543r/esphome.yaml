@@ -1,0 +1,13 @@
+substitutions:
+  name: espcontrol-jc4827w543r
+  friendly_name: EspControl JC4827W543R
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+packages:
+  device: !include device/device.yaml
+  backlight: !include addon/backlight.yaml
+  display: !include device/display.yaml
+  screen: !include device/screen.yaml
