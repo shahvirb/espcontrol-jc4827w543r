@@ -11,6 +11,8 @@ This repository does not support that hardware yet. Add support progressively
 in vertical slices, keeping each change focused and leaving the existing device
 support working.
 
+Hardware: https://devices.esphome.io/devices/guition-jc4827543c/
+
 ## Development Guidance
 
 - Compare hardware and configuration changes with the known-working project before implementing them.
