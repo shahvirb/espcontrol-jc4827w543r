@@ -18,3 +18,19 @@ support working.
 - Validate configuration and compilation where possible.
 - Distinguish compile validation from testing on the physical display and touchscreen.
 - Keep credentials and other secrets out of tracked files.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues for `shahvirb/espcontrol-jc4827w543r`.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default canonical triage labels on GitHub. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository. See `docs/agents/domain.md`.
