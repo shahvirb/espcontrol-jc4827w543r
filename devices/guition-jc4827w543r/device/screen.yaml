@@ -1,6 +1,8 @@
 lvgl:
   buffer_size: 25%
   rotation: 180
+  touchscreens:
+    - touchscreen_id: display_touch
   pages:
     - id: test_page
       bg_color: 0x102030

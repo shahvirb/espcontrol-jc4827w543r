@@ -4,7 +4,9 @@ Minimal hardware-first configuration for display bring-up.
 
 This configuration includes the ESP32-S3 board setup, Wi-Fi, native OTA, the
 GPIO1 display backlight, the reference NV3041A display bus, and a simple LVGL
-test screen. Touch and EspControl integration remain deferred.
+test screen. It also includes the reference XPT2046 touchscreen bus and LVGL
+touch binding with calibration values measured from the four-corner hardware
+test.
 
 Build from this directory with:
 

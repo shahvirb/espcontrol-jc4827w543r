@@ -10,4 +10,5 @@ packages:
   device: !include device/device.yaml
   backlight: !include addon/backlight.yaml
   display: !include device/display.yaml
+  touchscreen: !include device/touchscreen.yaml
   screen: !include device/screen.yaml
