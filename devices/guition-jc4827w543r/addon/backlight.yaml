@@ -1,0 +1,12 @@
+output:
+  - platform: ledc
+    pin: GPIO1
+    id: display_backlight_pwm
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    output: display_backlight_pwm
+    id: display_backlight
+    name: Display Backlight
+    restore_mode: ALWAYS_ON

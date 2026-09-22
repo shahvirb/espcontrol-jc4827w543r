@@ -1,0 +1,22 @@
+# Resistive XPT2046 touchscreen on its dedicated SPI bus.
+spi:
+  - id: touchscreen_spi
+    clk_pin: GPIO12
+    mosi_pin: GPIO11
+    miso_pin: GPIO13
+
+touchscreen:
+  - platform: xpt2046
+    id: display_touch
+    display: display_panel
+    spi_id: touchscreen_spi
+    cs_pin: GPIO38
+    update_interval: 50ms
+    calibration:
+      x_min: 330
+      x_max: 3800
+      y_min: 500
+      y_max: 3600
+    transform:
+      mirror_x: false
+      mirror_y: false

@@ -1,0 +1,5 @@
+# Single application layout for 4 MB panels whose full EspControl image does
+# not fit in the standard dual-OTA partition layout.
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xe000,   0x2000,
+app0,     app,  factory, 0x10000,  0x3F0000,

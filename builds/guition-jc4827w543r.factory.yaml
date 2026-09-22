@@ -1,0 +1,41 @@
+# =============================================================================
+# FACTORY BUILD - Guition JC4827W543R (4.3" landscape)
+# =============================================================================
+# Factory image: www.js bundled inline for first-boot web UI access.
+# =============================================================================
+
+substitutions:
+  cover_art_placeholder_file: "../common/assets/cover_art_placeholder.svg"
+  name: "espcontrol-jc4827w543r"
+  friendly_name: "Guition JC4827W543R"
+  firmware_version: "0.0.0"
+  espcontrol_component_url: "file:///config"
+  mdi_font_file: "/config/common/assets/fonts/materialdesignicons-webfont-7.4.47.ttf"
+  espcontrol_component_ref: "HEAD"
+
+esp32:
+  partitions: "../common/device/partitions_4mb_single_app.csv"
+
+packages:
+  core: !include ../devices/guition-jc4827w543r/packages.yaml
+  api_encryption: !include ../common/addon/api_encryption_dynamic.yaml
+
+esphome:
+  name_add_mac_suffix: true
+  project:
+    name: jtenniswood.espcontrol
+    version: "${firmware_version}"
+
+dashboard_import:
+  package_import_url: github://jtenniswood/espcontrol/devices/guition-jc4827w543r/esphome.yaml@main
+
+web_server:
+  port: 80
+  version: 3
+  js_url: https://shahvirb.github.io/espcontrol-jc4827w543r/webserver/www.js?device=${device_slug}&v=${firmware_version}&ui=20260714-shared
+
+wifi:
+  ap:
+    ssid: "${friendly_name}"
+
+captive_portal:

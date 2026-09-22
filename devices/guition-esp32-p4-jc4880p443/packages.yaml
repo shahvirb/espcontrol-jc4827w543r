@@ -10,6 +10,7 @@ substitutions:
   cover_art_placeholder_file: "https://raw.githubusercontent.com/jtenniswood/espcontrol/main/common/assets/cover_art_placeholder.svg"
   device_slug: "guition-esp32-p4-jc4880p443"
   firmware_manifest_slug: "guition-esp32-p4-jc4880p443"
+  web_asset_base_url: "https://jtenniswood.github.io/espcontrol"
   firmware_version: "dev"
   screen_width: "480"
   screen_height: "800"
