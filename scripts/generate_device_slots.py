@@ -37,6 +37,7 @@ def package_substitution_lines(device: dict) -> list[str]:
         '  cover_art_placeholder_file: "https://raw.githubusercontent.com/jtenniswood/espcontrol/main/common/assets/cover_art_placeholder.svg"',
         f'  device_slug: "{device["slug"]}"',
         f'  firmware_manifest_slug: "{device["slug"]}"',
+        f'  web_asset_base_url: "{package.get("webAssetBaseUrl", "https://jtenniswood.github.io/espcontrol")}"',
     ]
     if package.get("firmwareVersion"):
         lines.append(f'  firmware_version: "{package["firmwareVersion"]}"')
@@ -203,7 +204,10 @@ def package_file_text(device: dict) -> str:
         [
             "substitutions:",
             *package_substitution_lines(device),
-            f'  image_card_slot_capacity: "{int(device["image_slot_capacity"])}"',
+            # The shared image runtime requires a positive static context array;
+            # zero-capacity profiles keep image cards disabled but reserve one
+            # inert context so the common component still compiles.
+            f'  image_card_slot_capacity: "{max(1, int(device["image_slot_capacity"]))}"',
             "",
             "esphome:",
             "  build_flags:",

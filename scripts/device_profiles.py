@@ -109,6 +109,8 @@ CANONICAL_PUBLIC_KEYS = ("name", "docsPath", "screenSize", "resolution", "orient
 CANONICAL_FIRMWARE_KEYS = ("build", "fonts", "display", "package")
 CANONICAL_PACKAGE_KEYS = (
     "firmwareVersion",
+    "embeddedWeb",
+    "webAssetBaseUrl",
     "subpageConfigChunks",
     "substitutions",
     "deviceFontPackageKey",
@@ -652,7 +654,7 @@ def validate_package(slug: str, device: dict[str, Any], errors: list[str]) -> No
     if package is None:
         return
 
-    for key in ("firmwareVersion", "deviceFontPackageKey"):
+    for key in ("firmwareVersion", "deviceFontPackageKey", "webAssetBaseUrl"):
         if key in package and (not isinstance(package.get(key), str) or not package.get(key)):
             errors.append(device_error(slug, f"firmware.package.{key} must be a non-empty string when set"))
 
@@ -665,6 +667,7 @@ def validate_package(slug: str, device: dict[str, Any], errors: list[str]) -> No
         "alarmDelayAudio",
         "apiNavigateAction",
         "esp32C6FirmwareUpdate",
+        "embeddedWeb",
     ):
         if key in package and not isinstance(package[key], bool):
             errors.append(device_error(slug, f"firmware.package.{key} must be true or false when set"))
