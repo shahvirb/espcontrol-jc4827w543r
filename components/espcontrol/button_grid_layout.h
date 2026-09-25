@@ -426,11 +426,16 @@ inline void set_card_checked_state(lv_obj_t *btn, bool checked) {
   sync_card_checked_text_color(btn);
 }
 
-// Match the main-page button widget label behavior so longer titles wrap
-// instead of running off the edge of the tile.
+// Match the main-page button widget label behavior. A profile that clamps a
+// label to one line uses ellipsis; taller labels retain wrapping.
 inline void configure_button_label_wrap(lv_obj_t *label) {
   if (!label) return;
-  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+  const lv_font_t *font = lv_obj_get_style_text_font(label, LV_PART_MAIN);
+  const lv_coord_t max_height = lv_obj_get_style_max_height(label, LV_PART_MAIN);
+  const bool single_line_clamp = font && max_height != LV_COORD_MAX &&
+    max_height <= font->line_height;
+  lv_label_set_long_mode(
+    label, single_line_clamp ? LV_LABEL_LONG_DOT : LV_LABEL_LONG_WRAP);
   lv_obj_set_width(label, lv_pct(100));
 }
 

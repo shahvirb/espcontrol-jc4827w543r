@@ -87,7 +87,7 @@ export function createWebStyles(dragAnimation: boolean): string {
         "font-size:var(--btn-icon);line-height:1;color:#fff;z-index:1}" +
         ".sp-btn>.sp-btn-label,.sp-btn>.sp-btn-label-row{margin-top:auto}" +
         ".sp-media-group-active{box-shadow:inset 0 0 0 3px var(--accent)}" +
-        ".sp-btn-label{display:block;max-height:var(--btn-label-max-height);overflow:hidden;word-break:break-word;min-height:0}" +
+        ".sp-btn-label{display:block;max-height:var(--btn-label-max-height);overflow:hidden;white-space:var(--btn-label-white-space,normal);text-overflow:var(--btn-label-text-overflow,clip);word-break:break-word;min-height:0}" +
         ".sp-sensor-badge{position:absolute;top:var(--sensor-top);right:var(--sensor-right);font-size:var(--sensor-fs);opacity:.5}" +
         ".sp-sensor-preview{display:flex;align-items:baseline;gap:.18em;color:#fff}" +
         ".sp-climate-temp-card .sp-sensor-preview{position:absolute;left:var(--btn-pad);top:var(--btn-pad)}" +
@@ -137,20 +137,20 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-btn-label-row.sp-media-cover-details-row{width:auto;margin:0 var(--btn-pad) var(--btn-pad)}" +
         ".sp-btn-big .sp-media-cover-details-row{margin-top:calc(var(--btn-pad)*.5)}" +
         ".sp-btn-double{grid-row:span 2}" +
-        ".sp-btn-double .sp-btn-label,.sp-btn-double .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl)}" +
+        ".sp-btn-double .sp-btn-label,.sp-btn-double .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl);white-space:normal;text-overflow:clip}" +
         ".sp-btn-double .sp-media-now-title{-webkit-line-clamp:2}" +
         ".sp-btn-wide{grid-column:span 2}" +
         ".sp-btn-wide .sp-media-now-title{-webkit-line-clamp:var(--btn-lines-dbl)}" +
         ".sp-btn-extra-tall{grid-row:span 3}" +
-        ".sp-btn-extra-tall .sp-btn-label,.sp-btn-extra-tall .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl)}" +
+        ".sp-btn-extra-tall .sp-btn-label,.sp-btn-extra-tall .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl);white-space:normal;text-overflow:clip}" +
         ".sp-btn-extra-tall .sp-media-now-title{-webkit-line-clamp:var(--btn-lines-dbl)}" +
         ".sp-btn-extra-wide{grid-column:span 3}" +
         ".sp-btn-extra-wide .sp-media-now-title{-webkit-line-clamp:var(--btn-lines-dbl)}" +
         ".sp-btn-big{grid-row:span 2;grid-column:span 2}" +
-        ".sp-btn-big .sp-btn-label,.sp-btn-big .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl)}" +
+        ".sp-btn-big .sp-btn-label,.sp-btn-big .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl);white-space:normal;text-overflow:clip}" +
         ".sp-btn-big .sp-media-now-title{-webkit-line-clamp:var(--btn-lines-dbl)}" +
         ".sp-btn-extra-large{grid-row:span 3;grid-column:span 3}" +
-        ".sp-btn-extra-large .sp-btn-label,.sp-btn-extra-large .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl)}" +
+        ".sp-btn-extra-large .sp-btn-label,.sp-btn-extra-large .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl);white-space:normal;text-overflow:clip}" +
         ".sp-btn-extra-large .sp-media-now-title{-webkit-line-clamp:var(--btn-lines-dbl)}" +
         ".sp-btn-big .sp-media-cover-details-title{-webkit-line-clamp:2}" +
         ".sp-btn-wide .sp-media-cover-details-title,.sp-btn-extra-wide .sp-media-cover-details-title{-webkit-line-clamp:2}" +
@@ -161,6 +161,7 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-btn-landscape-large{grid-row:span 3;grid-column:span 4}" +
         ".sp-btn-ultra-wide{grid-column:span 5}" +
         ".sp-btn-ultra-wide .sp-media-now-title{-webkit-line-clamp:var(--btn-lines-dbl)}" +
+        ".sp-btn-max-wide .sp-btn-label,.sp-btn-max-wide .sp-btn-label-row .sp-btn-label,.sp-btn-max-tall .sp-btn-label,.sp-btn-max-tall .sp-btn-label-row .sp-btn-label,.sp-btn-portrait-large .sp-btn-label,.sp-btn-portrait-large .sp-btn-label-row .sp-btn-label,.sp-btn-landscape-large .sp-btn-label,.sp-btn-landscape-large .sp-btn-label-row .sp-btn-label{max-height:var(--btn-label-max-height-dbl);white-space:normal;text-overflow:clip}" +
         ".sp-empty-cell{border:2px dashed rgba(255,255,255,.15);background:transparent;" +
         "border-radius:var(--empty-r);display:flex;align-items:center;justify-content:center;" +
         "cursor:pointer;transition:border-color .2s,background-color .2s}" +
