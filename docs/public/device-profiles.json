@@ -210,7 +210,7 @@
       },
       "chipFamily": "ESP32-S3",
       "relays": 0,
-      "rotation": false,
+      "rotation": true,
       "ethernetManualInstall": false,
       "subpages": true
     }

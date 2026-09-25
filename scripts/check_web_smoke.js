@@ -360,11 +360,18 @@ for (const [slug, device] of Object.entries(manifest.devices || {})) {
   );
 }
 
+const generatedRotationFeatures = generated.match(/features:\{[^}]*\}/g) || [];
 for (const [slug, device] of Object.entries(manifest.devices || {})) {
   if (!device.rotation || !device.rotation.enabled) continue;
-  const featureConfig = generated.match(/features:\{[^}]*\}/)?.[0] || "";
+  const featureConfig = generatedRotationFeatures.find((candidate) =>
+    candidate.includes(`screenRotationOptions:${JSON.stringify(device.rotation.options)}`) &&
+    (!Object.prototype.hasOwnProperty.call(device.rotation, "default") ||
+      candidate.includes(`screenRotationDefault:${JSON.stringify(device.rotation.default)}`)) &&
+    (!Object.prototype.hasOwnProperty.call(device.rotation, "displayOffset") ||
+      candidate.includes(`screenRotationDisplayOffset:${device.rotation.displayOffset}`))
+  ) || "";
   assert(
-    /features:\{[^}]*screenRotation:!0/.test(generated),
+    /features:\{[^}]*screenRotation:!0/.test(featureConfig),
     `${slug}: generated web UI must expose screen rotation when rotation is enabled`
   );
   assert.deepStrictEqual(device.rotation.options, ALL_ROTATIONS, `${slug}: normal rotation options`);

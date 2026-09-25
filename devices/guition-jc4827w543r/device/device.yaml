@@ -300,7 +300,31 @@ lvgl:
 script:
   - id: apply_screen_rotation
     then:
-      - lvgl.display.set_rotation: 0
+      - if:
+          condition:
+            lambda: 'return id(screen_rotation_select).current_option() == "0";'
+          then:
+            - lvgl.display.set_rotation: 0
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(screen_rotation_select).current_option() == "90";'
+                then:
+                  - lvgl.display.set_rotation: 90
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(screen_rotation_select).current_option() == "180";'
+                      then:
+                        - lvgl.display.set_rotation: 180
+                      else:
+                        - if:
+                            condition:
+                              lambda: 'return id(screen_rotation_select).current_option() == "270";'
+                            then:
+                              - lvgl.display.set_rotation: 270
+                            else:
+                              - lvgl.display.set_rotation: 0
 
 select:
   - platform: template
@@ -315,6 +339,9 @@ select:
     initial_option: "0"
     options:
       - "0"
+      - "90"
+      - "180"
+      - "270"
     on_value:
       then:
         - if:
@@ -322,4 +349,4 @@ select:
               lambda: 'return id(screen_rotation_ready);'
             then:
               - script.execute: apply_screen_rotation
-              - script.execute: clock_bar_apply
+              - script.execute: refresh_button_grid

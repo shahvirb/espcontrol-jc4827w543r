@@ -1561,7 +1561,7 @@
         "firmwareGrid": "3x2"
       },
       "rotation": {
-        "enabled": false,
+        "enabled": true,
         "options": [
           "0",
           "90",
@@ -1577,6 +1577,14 @@
         "screen": {
           "width": "100%",
           "aspect": "480/272"
+        },
+        "portrait": {
+          "cols": 2,
+          "rows": 3,
+          "screen": {
+            "width": "56.67%",
+            "aspect": "272/480"
+          }
         },
         "topbar": {
           "height": 8.0,
