@@ -277,7 +277,7 @@ inline void apply_card_label_line_clamp(lv_obj_t *label, const GridConfig &cfg,
     ? cfg.label_lines_tall
     : cfg.label_lines;
   if (lines <= 0) return;
-  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+  lv_label_set_long_mode(label, lines == 1 ? LV_LABEL_LONG_DOT : LV_LABEL_LONG_WRAP);
   lv_obj_set_width(label, lv_pct(100));
   const lv_font_t *font = lv_obj_get_style_text_font(label, LV_PART_MAIN);
   lv_coord_t line_height = font && font->line_height > 0 ? font->line_height : 16;

@@ -122,6 +122,8 @@ export function createCoreFeature(
         var labelLinesDouble: any = btn.labelLinesDouble || labelLines;
         r.setProperty("--btn-lines", String(labelLines));
         r.setProperty("--btn-lines-dbl", String(labelLinesDouble));
+        r.setProperty("--btn-label-white-space", labelLines === 1 ? "nowrap" : "normal");
+        r.setProperty("--btn-label-text-overflow", labelLines === 1 ? "ellipsis" : "clip");
         r.setProperty("--btn-label-max-height", scaledCqw(btn.labelSize * 1.2 * labelLines, scale));
         r.setProperty("--btn-label-max-height-dbl", scaledCqw(btn.labelSize * 1.2 * labelLinesDouble, scale));
         r.setProperty("--sensor-top", scaledCqw(sensorBadge.top, scale));

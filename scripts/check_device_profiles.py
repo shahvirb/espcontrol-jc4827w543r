@@ -513,6 +513,7 @@ def test_square_s3_reapplies_clock_bar_after_screen_changes() -> None:
 
 def test_rotation_refresh_rebuilds_subpages() -> None:
     slugs = (
+        "guition-jc4827w543r",
         "guition-esp32-p4-jc1060p470",
         "guition-esp32-p4-jc1060p470-v2",
         "guition-esp32-p4-jc4880p443",
@@ -528,6 +529,42 @@ def test_rotation_refresh_rebuilds_subpages() -> None:
         assert "grid_rebuild_all(slots, cfg," in refresh_script, (
             f"{slug}: rotation refresh must rebuild secondary cards safely"
         )
+
+
+def test_jc4827_rotation_setting_is_wired() -> None:
+    slug = "guition-jc4827w543r"
+    profile = load_device_profiles()[slug]
+    assert profile["rotation"]["enabled"], f"{slug}: Web UI rotation must be enabled"
+    assert profile["rotation"]["options"] == ["0", "90", "180", "270"], (
+        f"{slug}: expose all four rotation choices"
+    )
+    assert profile["rotation"]["default"] == "0", f"{slug}: keep the native orientation as default"
+    assert profile["rotation"].get("displayOffset", 0) == 0, (
+        f"{slug}: UI degrees must map directly to the native landscape panel"
+    )
+
+    device = (ROOT / "devices" / slug / "device" / "device.yaml").read_text(encoding="utf-8")
+    apply_rotation = device.split("  - id: apply_screen_rotation\n", 1)[1].split(
+        "\nselect:\n", 1
+    )[0]
+    for angle in ("0", "90", "180", "270"):
+        assert f'id(screen_rotation_select).current_option() == "{angle}"' in apply_rotation, (
+            f"{slug}: rotation {angle} must have a firmware mapping"
+        )
+        assert f"lvgl.display.set_rotation: {angle}" in apply_rotation, (
+            f"{slug}: rotation {angle} must reach LVGL"
+        )
+
+    selector = device.split("select:\n", 1)[1].split(
+        "    id: screen_rotation_select", 1
+    )[1].split("\n  - platform:", 1)[0]
+    for angle in ("0", "90", "180", "270"):
+        assert f'      - "{angle}"' in selector, f"{slug}: selector must offer rotation {angle}"
+    assert '    initial_option: "0"' in selector, f"{slug}: native rotation must remain the default"
+    assert "script.execute: apply_screen_rotation" in selector
+    assert "script.execute: refresh_button_grid" in selector, (
+        f"{slug}: changing rotation must reflow the grid and subpages"
+    )
 
 
 def test_restored_display_sensors_bind_without_reboot() -> None:
@@ -1019,6 +1056,7 @@ def main() -> int:
     test_local_voice_generation_uses_capability()
     test_square_s3_reapplies_clock_bar_after_screen_changes()
     test_rotation_refresh_rebuilds_subpages()
+    test_jc4827_rotation_setting_is_wired()
     test_restored_display_sensors_bind_without_reboot()
     test_seven_inch_width_compensation_rotates_with_screen()
     test_subpage_config_changes_schedule_live_refresh()

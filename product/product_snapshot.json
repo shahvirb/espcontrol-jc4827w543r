@@ -1614,7 +1614,7 @@
         "firmwareGrid": "3x2"
       },
       "rotation": {
-        "enabled": false,
+        "enabled": true,
         "options": [
           "0",
           "90",
@@ -1631,6 +1631,14 @@
         "screen": {
           "width": "100%",
           "aspect": "480/272"
+        },
+        "portrait": {
+          "cols": 2,
+          "rows": 3,
+          "screen": {
+            "width": "56.67%",
+            "aspect": "272/480"
+          }
         },
         "topbar": {
           "height": 8.0,
@@ -1653,7 +1661,7 @@
           "labelSize": 4.0,
           "coverArtTitleSize": 14.583333,
           "coverArtArtistSize": 8.333333,
-          "labelLines": 2,
+          "labelLines": 1,
           "labelLinesDouble": 3
         },
         "emptyCell": {

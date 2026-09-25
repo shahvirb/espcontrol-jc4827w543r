@@ -1369,7 +1369,7 @@ def firmware_media_sleep_prevention_errors(
     return errors
 
 
-def firmware_touch_cover_art_delay_errors(paths: tuple[Path, ...], root: Path) -> list[str]:
+def firmware_touch_wake_errors(paths: tuple[Path, ...], root: Path) -> list[str]:
     errors: list[str] = []
     required_sequence = (
         "on_touch:\n"
@@ -1379,11 +1379,15 @@ def firmware_touch_cover_art_delay_errors(paths: tuple[Path, ...], root: Path) -
     )
     for path in paths:
         text = path.read_text(encoding="utf-8")
+        if not re.search(r"(?m)^\s*touchscreen:\s*$", text):
+            continue
+        rel = path.relative_to(root)
         if "on_touch:" not in text or "script.execute: screensaver_wake" not in text:
+            errors.append(f"{rel}: route touchscreen touches through screensaver_wake")
             continue
         if required_sequence not in text:
             errors.append(
-                f"{path.relative_to(root)}: restart the cover art Show After delay before every touchscreen wake"
+                f"{rel}: restart the cover art Show After delay before every touchscreen wake"
             )
     return errors
 
@@ -3719,7 +3723,7 @@ def run_scan() -> int:
     errors.extend(firmware_cover_art_disable_errors(COVER_ART_PATH, ROOT))
     errors.extend(firmware_cover_art_lifecycle_controller_errors(BACKLIGHT_PATH, COVER_ART_PATH, ROOT))
     errors.extend(firmware_media_sleep_prevention_errors(BACKLIGHT_PATH, DISPLAY_CONFIG_PATH, COVER_ART_PATH, ROOT))
-    errors.extend(firmware_touch_cover_art_delay_errors(DEVICE_TOUCH_PATHS, ROOT))
+    errors.extend(firmware_touch_wake_errors(DEVICE_TOUCH_PATHS, ROOT))
     errors.extend(firmware_media_sleep_prevention_subscription_errors(DEVICE_SENSOR_PATHS, ROOT))
     errors.extend(firmware_media_control_low_heap_metadata_errors(FIRMWARE_DIR, ROOT))
     errors.extend(firmware_media_group_lifecycle_errors(FIRMWARE_DIR, ROOT))
@@ -4728,7 +4732,58 @@ def expect_c6_update_status_errors(name: str, text: str, expected: tuple[str, ..
             assert not errors, f"{name}: expected no errors, got {errors!r}"
 
 
+def expect_touch_wake_errors(
+    name: str, files: dict[str, str], expected: tuple[str, ...]
+) -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        paths: list[Path] = []
+        for filename, text in files.items():
+            path = root / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+            paths.append(path)
+
+        errors = firmware_touch_wake_errors(tuple(paths), root)
+        for item in expected:
+            assert any(item in error for error in errors), f"{name}: missing {item!r} in {errors!r}"
+        if not expected:
+            assert not errors, f"{name}: expected no errors, got {errors!r}"
+
+
 def run_self_test() -> int:
+    valid_touch_wake = (
+        "touchscreen:\n"
+        "  - platform: xpt2046\n"
+        "    on_touch:\n"
+        "      - script.execute: cover_art_pause_after_touch\n"
+        "      - script.wait: cover_art_pause_after_touch\n"
+        "      - script.execute: screensaver_wake\n"
+    )
+    expect_touch_wake_errors(
+        "non-touchscreen devices do not need a wake callback",
+        {"devices/no-touch/device/device.yaml": "display:\n  - platform: test\n"},
+        (),
+    )
+    expect_touch_wake_errors(
+        "touchscreen definitions require a wake callback",
+        {"devices/touch/device/touchscreen.yaml": "touchscreen:\n  - platform: xpt2046\n"},
+        ("route touchscreen touches through screensaver_wake",),
+    )
+    expect_touch_wake_errors(
+        "touchscreen wake preserves the cover art delay sequence",
+        {"devices/touch/device/touchscreen.yaml": valid_touch_wake},
+        (),
+    )
+    expect_touch_wake_errors(
+        "touchscreen wake must wait for cover art pause",
+        {
+            "devices/touch/device/touchscreen.yaml": valid_touch_wake.replace(
+                "      - script.wait: cover_art_pause_after_touch\n", ""
+            )
+        },
+        ("restart the cover art Show After delay before every touchscreen wake",),
+    )
     for call in (
         "api->get_home_assistant_state(entity, callback);",
         "api.get_home_assistant_state(entity, callback);",

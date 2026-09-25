@@ -4,13 +4,14 @@
     "slots": 6, "capabilities": { "imageSlots": 0 },
     "public": { "name": "Guition JC4827W543R", "docsPath": "/screens/jc4827w543r", "screenSize": "4.3 inches", "resolution": "480 x 272", "orientation": "Landscape" },
     "layout": { "cols": 2, "rows": 3, "firmwareGrid": "3x2" },
-    "rotation": { "enabled": false, "options": ["0", "90", "180", "270"], "default": "0", "displayOffset": 0 },
+    "rotation": { "enabled": true, "options": ["0", "90", "180", "270"], "default": "0", "displayOffset": 0 },
     "web": {
       "dragMode": "displace", "dragAnimation": true,
       "screen": { "width": "100%", "aspect": "480/272" },
+      "portrait": { "cols": 2, "rows": 3, "screen": { "width": "56.67%", "aspect": "272/480" } },
       "topbar": { "height": 8.0, "padding": "1.25cqw 0.83cqw 0.83cqw", "fontSize": 3.75 },
       "grid": { "top": 8.33, "compactTop": 0.83, "left": 1.04, "right": 1.04, "bottom": 0.83, "gap": 0.76, "fr": "1fr" },
-      "btn": { "radius": 1.67, "padding": 2.92, "iconSize": 9.58, "labelSize": 4.0, "coverArtTitleSize": 14.583333, "coverArtArtistSize": 8.333333, "labelLines": 2, "labelLinesDouble": 3 },
+      "btn": { "radius": 1.67, "padding": 2.92, "iconSize": 9.58, "labelSize": 4.0, "coverArtTitleSize": 14.583333, "coverArtArtistSize": 8.333333, "labelLines": 1, "labelLinesDouble": 3 },
       "emptyCell": { "radius": 1.67 }, "sensorBadge": { "top": 2.08, "right": 2.08, "fontSize": 3.33 }, "subpageBadge": { "bottom": 2.08, "right": 2.08, "fontSize": 4 }
     },
     "firmware": {
