@@ -138,7 +138,7 @@ web_server:
   ota: false
 
 safe_mode:
-  id: s3_4848s040_safe_mode
+  id: jc4827w543r_safe_mode
   boot_is_good_after: 10s
 
 # ---------------------------------------------------------------------------
