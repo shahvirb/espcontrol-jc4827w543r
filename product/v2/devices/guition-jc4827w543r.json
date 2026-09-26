@@ -6,7 +6,7 @@
     "layout": { "cols": 2, "rows": 3, "firmwareGrid": "3x2" },
     "rotation": { "enabled": true, "options": ["0", "90", "180", "270"], "default": "0", "displayOffset": 0 },
     "web": {
-      "dragMode": "displace", "dragAnimation": true,
+      "dragMode": "displace", "dragAnimation": true, "disabledCardTypes": ["weather_forecast"],
       "screen": { "width": "100%", "aspect": "480/272" },
       "portrait": { "cols": 2, "rows": 3, "screen": { "width": "56.67%", "aspect": "272/480" } },
       "topbar": { "height": 8.0, "padding": "1.25cqw 0.83cqw 0.83cqw", "fontSize": 3.75 },

@@ -1628,6 +1628,9 @@
       "web": {
         "dragMode": "displace",
         "dragAnimation": true,
+        "disabledCardTypes": [
+          "weather_forecast"
+        ],
         "screen": {
           "width": "100%",
           "aspect": "480/272"

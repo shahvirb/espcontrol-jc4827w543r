@@ -125,6 +125,19 @@ def test_s3_exposes_camera_and_media_cover_art(profiles: dict[str, dict]) -> Non
     )
 
 
+def test_jc4827_weather_forecast_matches_firmware(profiles: dict[str, dict]) -> None:
+    slug = "guition-jc4827w543r"
+    profile = profiles[slug]
+    disabled = set(web_config(profile).get("disabledCardTypes", []))
+    assert "weather_forecast" in disabled, (
+        f"{slug}: web profile must disable forecast modes while firmware compiles them out"
+    )
+    device = (ROOT / "devices" / slug / "device" / "device.yaml").read_text(encoding="utf-8")
+    assert '"-DESPCONTROL_DISABLE_WEATHER_FORECAST=1"' in device, (
+        f"{slug}: profile check expects firmware to disable forecast rendering"
+    )
+
+
 def test_public_device_capabilities(profile_slugs: list[str]) -> None:
     expected = public_device_capabilities()
     actual = read_json(DEVICE_CAPABILITIES_JSON)
@@ -1075,6 +1088,7 @@ def main() -> int:
     test_s3_low_heap_policy()
     test_zero_image_capacity_disables_all_image_card_pickers(profiles)
     test_s3_exposes_camera_and_media_cover_art(profiles)
+    test_jc4827_weather_forecast_matches_firmware(profiles)
     test_generated_yaml(profiles)
     test_v3_release_configuration()
     test_jc4827_is_usb_only_for_firmware_updates()
