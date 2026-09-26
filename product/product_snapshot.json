@@ -1743,6 +1743,7 @@
         },
         "package": {
           "firmwareVersion": "dev",
+          "firmwareUpdateEnabled": false,
           "embeddedWeb": false,
           "webAssetBaseUrl": "https://shahvirb.github.io/espcontrol-jc4827w543r",
           "subpageConfigChunks": 4,

@@ -295,6 +295,19 @@ def test_generated_yaml(profiles: dict[str, dict]) -> None:
         sensors = sensor_path.read_text(encoding="utf-8")
         assert f'device_slug: "{slug}"' in package, f"{slug}: packages.yaml missing device slug"
         assert f'firmware_manifest_slug: "{slug}"' in package, f"{slug}: packages.yaml missing manifest slug"
+        package_profile = profile["firmware"]["package"]
+        if package_profile.get("firmwareUpdateEnabled", True) is False:
+            expected_updater = "firmware_update_disabled.yaml"
+        elif package_profile.get("ethernetSelectable"):
+            expected_updater = "firmware_update${firmware_update_package_suffix}.yaml"
+        else:
+            expected_updater = "firmware_update.yaml"
+        updater_line = next(
+            line for line in package.splitlines() if line.strip().startswith("fw_update:")
+        )
+        assert expected_updater in updater_line, (
+            f"{slug}: firmware updater include should select {expected_updater}"
+        )
         assert f"cfg.num_slots = {profile['slots']};" in sensors, f"{slug}: sensors.yaml missing slot count"
         test_native_panel_config_bindings(slug, profile, device)
         label_lines = profile["web"]["btn"]["labelLines"]
@@ -352,6 +365,21 @@ def test_v3_release_configuration() -> None:
     assert 'js_include: "../docs/public/webserver/embedded/www.js"' in factory
     assert f"!include {V3_SLUG}.factory.yaml" in recovery
     assert "esp32_c6_recovery.yaml" in recovery
+
+
+def test_jc4827_is_usb_only_for_firmware_updates() -> None:
+    slug = "guition-jc4827w543r"
+    package = (ROOT / "devices" / slug / "packages.yaml").read_text(encoding="utf-8")
+    device = (ROOT / "devices" / slug / "device" / "device.yaml").read_text(encoding="utf-8")
+    assert "fw_update:       !include ../../common/addon/firmware_update_disabled.yaml" in package
+    assert not re.search(r"(?m)^ota:", device), f"{slug}: native and HTTP OTA platforms must be absent"
+    assert "web_server:\n  ota: false" in device, f"{slug}: browser OTA must be disabled"
+    disabled_updater = (ROOT / "common" / "addon" / "firmware_update_disabled.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert 'name: "${entity_firmware_version}"' in disabled_updater, (
+        f"{slug}: disabled updater package must retain firmware-version reporting"
+    )
 
 
 def test_public_api_encryption_policy(profile_slugs: list[str]) -> None:
@@ -1049,6 +1077,7 @@ def main() -> int:
     test_s3_exposes_camera_and_media_cover_art(profiles)
     test_generated_yaml(profiles)
     test_v3_release_configuration()
+    test_jc4827_is_usb_only_for_firmware_updates()
     test_public_api_encryption_policy(profile_slugs)
     test_ota_preserves_deployed_partition_layouts()
     test_upgrades_do_not_reset_saved_panel_config()

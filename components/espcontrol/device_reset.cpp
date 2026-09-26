@@ -14,7 +14,9 @@
 #include "esphome/core/log.h"
 #include "esphome/components/json/json_util.h"
 #include "esphome/components/web_server_idf/web_server_idf.h"
+#ifdef USE_OTA
 #include "esphome/components/ota/ota_backend.h"
+#endif
 #ifdef USE_SWITCH
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/web_server_idf/utils.h"
@@ -105,12 +107,14 @@ class NvsStorage final : public Storage {
     return panel(false) && entries(mode, remaining) && remaining.empty();
   }
 } storage;
+#ifdef USE_OTA
 class OtaListener : public esphome::ota::OTAGlobalStateListener {
  public:
   void on_ota_global_state(esphome::ota::OTAState state, float, uint8_t, esphome::ota::OTAComponent *source) override {
     interlock.set_ota_source_busy(source, state != esphome::ota::OTA_ERROR && state != esphome::ota::OTA_ABORT);
   }
 } ota_listener;
+#endif
 void respond(httpd_req_t *raw, const char *status, const char *body) {
   httpd_resp_set_status(raw, status);
   httpd_resp_set_type(raw, "application/json");
@@ -226,7 +230,9 @@ void early_startup(bool compiled_networks, const char *username, const char *pas
   }
   current_epoch.store(journal.epoch);
   initialized.store(true);
+#ifdef USE_OTA
   esphome::ota::get_global_ota_callback()->add_global_state_listener(&ota_listener);
+#endif
 }
 void register_handlers(esphome::web_server_idf::AsyncWebServer &server) { server.addHandler(new ResetHandler()); }
 }  // namespace espcontrol::reset

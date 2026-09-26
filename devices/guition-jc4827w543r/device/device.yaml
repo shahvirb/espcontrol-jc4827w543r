@@ -95,8 +95,8 @@ espcontrol:
 # peripherals after a software reset. A brief deep sleep forces a full
 # hardware reset on wake, equivalent to a power cycle. The on_boot
 # handler catches USB-triggered and software-triggered resets (the
-# latter fired by the "Apply Configuration" restart button); the OTA
-# on_end hook catches wireless updates.
+# latter fired by the "Apply Configuration" restart button). This
+# device uses USB-only firmware installation and has no OTA completion hook.
 # ---------------------------------------------------------------------------
 esphome:
   name: ${name}
@@ -114,20 +114,6 @@ esphome:
       then:
         - lambda: |-
             auto reason = esp_reset_reason();
-            if (reason == ESP_RST_SW) {
-              esp_ota_img_states_t ota_state;
-              const esp_partition_t *running = esp_ota_get_running_partition();
-              if (running != nullptr &&
-                  esp_ota_get_state_partition(running, &ota_state) == ESP_OK &&
-                  ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-                ESP_LOGI("s3_reset", "Marking OTA image valid before hardware-reset workaround");
-                id(s3_4848s040_safe_mode).mark_successful();
-                global_preferences->sync();
-                esp_sleep_enable_timer_wakeup(100000);
-                esp_deep_sleep_start();
-                return;
-              }
-            }
             if (reason == ESP_RST_USB || reason == ESP_RST_SW) {
               esp_sleep_enable_timer_wakeup(100000);
               esp_deep_sleep_start();
@@ -146,43 +132,10 @@ psram:
   speed: 80MHz
 
 # ---------------------------------------------------------------------------
-# OTA updates (ESPHome native + HTTP-based)
+# OTA updates are unsupported with this device's 4 MB single-app partition.
 # ---------------------------------------------------------------------------
-ota:
-  - platform: esphome
-    on_begin:
-      then:
-        - script.execute: show_update_writing
-        - script.wait: show_update_writing
-    on_end:
-      then:
-        - globals.set:
-            id: firmware_update_complete_pending
-            value: 'true'
-        - lambda: 'global_preferences->sync();'
-        - lambda: |-
-            esp_sleep_enable_timer_wakeup(100000);
-            esp_deep_sleep_start();
-    on_error:
-      then:
-        - script.execute: show_update_failed
-  - platform: http_request
-    on_begin:
-      then:
-        - script.execute: show_update_writing
-        - script.wait: show_update_writing
-    on_end:
-      then:
-        - globals.set:
-            id: firmware_update_complete_pending
-            value: 'true'
-        - lambda: 'global_preferences->sync();'
-        - lambda: |-
-            esp_sleep_enable_timer_wakeup(100000);
-            esp_deep_sleep_start();
-    on_error:
-      then:
-        - script.execute: show_update_failed
+web_server:
+  ota: false
 
 safe_mode:
   id: s3_4848s040_safe_mode

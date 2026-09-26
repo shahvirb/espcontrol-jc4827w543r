@@ -2465,10 +2465,21 @@ def firmware_camera_refresh_action_errors(root: Path) -> list[str]:
             "common/device/image_cards_2.yaml: keep the unsupported S3 camera refresh action disabled"
         )
 
+    profiles = json.loads(
+        (root / "devices" / "manifest.json").read_text(encoding="utf-8")
+    )["devices"]
     for package_path in sorted((root / "devices").glob("*/packages.yaml")):
         slug = package_path.parent.name
         package_text = package_path.read_text(encoding="utf-8")
-        expected = "image_cards_2.yaml" if slug == "guition-esp32-s3-4848s040" else "image_cards_6.yaml"
+        capacity = profiles[slug].get("capabilities", {}).get("imageSlots", 0)
+        if capacity == 0:
+            if re.search(r"(?m)^  image_cards:", package_text):
+                errors.append(
+                    f"{package_path.relative_to(root)}: omit the image-card package because "
+                    "the device profile has no image slots"
+                )
+            continue
+        expected = "image_cards.yaml" if capacity == 4 else f"image_cards_{capacity}.yaml"
         if expected not in package_text:
             errors.append(
                 f"{package_path.relative_to(root)}: include {expected} so camera refresh action support "

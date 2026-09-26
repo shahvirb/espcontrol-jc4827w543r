@@ -104,7 +104,7 @@ After a successful USB flash, tell the user to open **Setup > Settings > Backup 
    - For `all over USB`, flash the displays in the normal all-display sequence, but ask the user to connect the correct display before each USB flash if the connected device is not clearly identifiable.
 7. For OTA targets, check reachability first with `ping -c 2 -W 1000 <target>`.
 8. For USB flashing:
-   - If the user supplied a target, verify that exact path exists and is readable and writable.
+   - If the user supplied a target, verify that exact path first and use that same path for upload when it is readable and writable; do not silently normalize or substitute it.
    - On Linux, inspect `/dev/ttyACM*` and `/dev/ttyUSB*` when no target was supplied.
    - On macOS, inspect `/dev/cu.usbmodem*` when no target was supplied.
    - If there is no clear port, ask the user to connect the display or choose the port.

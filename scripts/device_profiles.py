@@ -109,6 +109,7 @@ CANONICAL_PUBLIC_KEYS = ("name", "docsPath", "screenSize", "resolution", "orient
 CANONICAL_FIRMWARE_KEYS = ("build", "fonts", "display", "package")
 CANONICAL_PACKAGE_KEYS = (
     "firmwareVersion",
+    "firmwareUpdateEnabled",
     "embeddedWeb",
     "webAssetBaseUrl",
     "subpageConfigChunks",
@@ -667,6 +668,7 @@ def validate_package(slug: str, device: dict[str, Any], errors: list[str]) -> No
         "alarmDelayAudio",
         "apiNavigateAction",
         "esp32C6FirmwareUpdate",
+        "firmwareUpdateEnabled",
         "embeddedWeb",
     ):
         if key in package and not isinstance(package[key], bool):

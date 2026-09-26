@@ -21,3 +21,11 @@ wifi:
 
 packages:
   espcontrol: !include packages.yaml
+
+# Use the checkout's live components so local development builds include
+# uncommitted component fixes as well as committed code.
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [espcontrol, web_server_idf, artwork_image, mipi_rgb]
