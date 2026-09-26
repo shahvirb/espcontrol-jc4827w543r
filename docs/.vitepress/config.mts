@@ -94,6 +94,13 @@ const screenProducts: Record<string, Record<string, string>> = {
     resolution: '1024 x 600',
     processor: 'ESP32-P4',
   },
+  'screens/jc4827w543r.md': {
+    name: 'Guition JC4827W543R',
+    model: 'JC4827W543R',
+    size: '4.3 inches',
+    resolution: '480 x 272',
+    processor: 'ESP32-S3',
+  },
   'screens/jc4880p443.md': {
     name: 'Guition JC4880P443',
     model: 'JC4880P443',
@@ -178,7 +185,7 @@ const faqItems = [
   {
     question: 'How Many Cards Can I Have?',
     answer:
-      'The home screen supports 20 cards on both JC8012P4A1 rear-case revisions, 15 on both JC1060P470 panel revisions, 6 on JC4880P443, and 9 on 4848S040 or the ESP32-P4 86 Panel, with more available through subpages.',
+      'The home screen supports 20 cards on both JC8012P4A1 rear-case revisions, 15 on both JC1060P470 panel revisions, 6 on JC4827W543R and JC4880P443, and 9 on 4848S040 or the ESP32-P4 86 Panel, with more available through subpages.',
   },
   {
     question: 'What Is a Subpage?',
@@ -193,7 +200,7 @@ const faqItems = [
   {
     question: 'Which Panels Are Supported?',
     answer:
-      'EspControl supports both Guition JC8012P4A1 rear-case revisions, both JC1060P470 panel revisions, JC4880P443, 4848S040, and ESP32-P4 86 Panel touchscreens.',
+      'EspControl supports both Guition JC8012P4A1 rear-case revisions, both JC1060P470 panel revisions, JC4827W543R, JC4880P443, 4848S040, and ESP32-P4 86 Panel touchscreens.',
   },
   {
     question: 'Does the Panel Work with Other Smart Home Platforms?',
@@ -419,6 +426,7 @@ export default defineConfig({
           { text: '10.1-inch JC8012P4A1', link: '/screens/jc8012p4a1' },
           { text: '10.1-inch JC8012P4A1 V3', link: '/screens/jc8012p4a1-v3' },
           { text: '7-inch JC1060P470', link: '/screens/jc1060p470' },
+          { text: '4.3-inch JC4827W543R', link: '/screens/jc4827w543r' },
           { text: '4.3-inch JC4880P443', link: '/screens/jc4880p443' },
           { text: '4-inch ESP32-P4 86 Panel', link: '/screens/p4-86' },
           { text: '4-inch 4848S040', link: '/screens/4848s040' },
