@@ -12,6 +12,7 @@ substitutions:
   firmware_manifest_slug: "guition-jc4827w543r"
   web_asset_base_url: "https://shahvirb.github.io/espcontrol-jc4827w543r"
   firmware_version: "dev"
+  screensaver_camera_supported: "false"
   screen_width: "480"
   screen_height: "272"
   content_width: "440"
@@ -135,6 +136,7 @@ packages:
   screen_setup:    !include ../../common/device/screen_button_setup.yaml
   screen_clock:    !include ../../common/device/screen_clock.yaml
   screen_art:      !include ../../common/device/screen_cover_art.yaml
+  screen_camera:   !include ../../common/device/screen_camera_screensaver_disabled.yaml
   # ---------------------------------------------------------------------------
   # Main page and dynamic sensor subscriptions (after setup screens)
   # ---------------------------------------------------------------------------
