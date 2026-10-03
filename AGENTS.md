@@ -18,6 +18,7 @@ that behavior.
 - Follow the repository's existing device patterns and use device-specific
   configuration for hardware details such as pins, display geometry, touch,
   fonts, layout, and defaults.
+- Follow [upstream repo](https://github.com/jtenniswood/espcontrol) conventions. Our goal is not to produce the cleanest architecture, rather we should prefer to follow upstream patterns where they exist.
 - Keep the device's manifest/catalog metadata, ESPHome packages, and generated
   device files in sync using the repository's existing generation workflow.
 - Before implementing a shared-source behavior change, explain why the
@@ -30,6 +31,7 @@ that behavior.
 - Validate configuration and compilation where possible. Report compile
   validation separately from testing on the physical display and touchscreen.
 - Keep credentials and other secrets out of tracked files.
+
 
 ## Agent skills
 
