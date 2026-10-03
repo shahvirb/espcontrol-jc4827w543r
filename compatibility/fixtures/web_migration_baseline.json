@@ -53,7 +53,7 @@
       "ntpServer1": "pool.ntp.org", "ntpServer2": "time.nist.gov", "ntpServer3": "time.google.com",
       "screensaverMode": "disabled", "presenceSensorEntity": "", "screensaverCameraEntity": "", "screensaverMetadataEntity": "", "metadataOverlay": false, "screensaverCameraImageMode": "Fit", "mediaPlayerSleepPrevention": true,
       "mediaPlayerSleepPreventionEntity": "", "coverArtScreensaver": false, "coverArtMediaPlayerEntity": "",
-      "coverArtSecondaryMediaPlayerEntity": "",
+      "coverArtSecondaryMediaPlayerEntity": "", "coverArtPlaybackControl": true,
       "coverArtAttributeConditions": "", "coverArtDelay": 10, "coverArtTrackOverlayDuration": 5,
       "coverArtHideExternalInput": true, "coverArtHomeAssistantEndpointMode": "Manual", "coverArtHomeAssistantProtocol": "https", "coverArtHomeAssistantPort": 8123,
       "autoUpdate": true, "updateFrequency": "Weekly", "screensaverAction": "off", "clockScreensaver": false, "clockOverlay": false,
@@ -110,5 +110,5 @@
       "/number/Screen%20Saver%3A%20Cover%20Art%20Delay/set?value=30"
     ]
   },
-  "bundleSize": { "minified": 2620056, "gzip": 1110978, "gzipTolerance": 9216 }
+  "bundleSize": { "minified": 2621577, "gzip": 1111234, "gzipTolerance": 9216 }
 }
