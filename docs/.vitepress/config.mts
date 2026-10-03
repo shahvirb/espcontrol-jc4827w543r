@@ -454,6 +454,7 @@ export default defineConfig({
       {
         text: 'About',
         items: [
+          { text: 'Commercial Partnerships', link: '/reference/partnerships' },
           { text: 'Privacy Policy', link: '/reference/privacy' },
         ],
       },
