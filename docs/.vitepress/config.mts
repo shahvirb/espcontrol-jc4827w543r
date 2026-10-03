@@ -448,7 +448,6 @@ export default defineConfig({
         text: 'Community',
         items: [
           { text: 'Contributing', link: '/reference/contributing' },
-          { text: 'Request Device Support', link: '/reference/request-device-support' },
         ],
       },
       {
