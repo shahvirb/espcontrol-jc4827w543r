@@ -3778,6 +3778,112 @@ def firmware_camera_screensaver_retained_token_errors(
     return errors
 
 
+def firmware_camera_resource_boundary_errors(root: Path) -> list[str]:
+    """Keep optional camera resources behind the enabled/disabled script boundary."""
+    shared_paths = {
+        root / "common" / "config" / "display.yaml":
+            "script.execute: camera_screensaver_refresh_image",
+        root / "common" / "device" / "screen_cover_art.yaml":
+            "id(camera_screensaver_refresh_image).execute();",
+        root / "common" / "addon" / "backlight.yaml":
+            "id(camera_screensaver_adopt_transition_generation).execute(",
+    }
+    optional_symbols = (
+        "camera_screensaver_downloaded_image",
+        "camera_screensaver_transition_generation",
+    )
+    errors: list[str] = []
+
+    for path, required_call in shared_paths.items():
+        rel = path.relative_to(root)
+        if not path.exists():
+            errors.append(f"{rel}: missing shared camera script boundary source")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for symbol in optional_symbols:
+            if symbol in text:
+                errors.append(
+                    f"{rel}: keep optional camera resource {symbol} behind a camera script"
+                )
+        if required_call not in text:
+            errors.append(f"{rel}: call the camera script boundary for the preserved operation")
+
+    enabled_path = root / "common" / "device" / "screen_camera_screensaver.yaml"
+    disabled_path = root / "common" / "device" / "screen_camera_screensaver_disabled.yaml"
+    if not enabled_path.exists():
+        errors.append("common/device/screen_camera_screensaver.yaml: missing enabled camera package")
+    if not disabled_path.exists():
+        errors.append(
+            "common/device/screen_camera_screensaver_disabled.yaml: missing disabled camera package"
+        )
+    if not enabled_path.exists() or not disabled_path.exists():
+        return errors
+
+    enabled = enabled_path.read_text(encoding="utf-8")
+    disabled = disabled_path.read_text(encoding="utf-8")
+    refresh_body = yaml_script_body(enabled, "camera_screensaver_refresh_image")
+    if refresh_body is None:
+        errors.append("common/device/screen_camera_screensaver.yaml: define camera image refresh boundary")
+    else:
+        cancel = "id(camera_screensaver_downloaded_image)->cancel_update();"
+        request = "script.execute: camera_screensaver_request_image"
+        if cancel not in refresh_body or request not in refresh_body or refresh_body.index(cancel) > refresh_body.index(request):
+            errors.append(
+                "common/device/screen_camera_screensaver.yaml: preserve camera cancel-before-request ordering"
+            )
+
+    generation_body = yaml_script_body(enabled, "camera_screensaver_adopt_transition_generation")
+    if generation_body is None:
+        errors.append(
+            "common/device/screen_camera_screensaver.yaml: define camera transition-generation boundary"
+        )
+    else:
+        if "parameters:\n      generation: int" not in generation_body:
+            errors.append(
+                "common/device/screen_camera_screensaver.yaml: preserve transition-generation script signature"
+            )
+        if (
+            "camera_screensaver_transition_generation" not in generation_body
+            or "static_cast<uint32_t>(generation)" not in generation_body
+        ):
+            errors.append(
+                "common/device/screen_camera_screensaver.yaml: preserve camera transition-generation update"
+            )
+
+    disabled_symbols = (
+        "camera_screensaver_downloaded_image",
+        "camera_screensaver_transition_generation",
+        "camera_screensaver_subscribed_entity",
+        "camera_screensaver_subscribed_generation",
+        "camera_screensaver_access_token",
+        "camera_screensaver_image_available",
+        "camera_screensaver_entity_unavailable",
+        "camera_screensaver_request_pending",
+        "camera_screensaver_use_sized_request",
+        "camera_screensaver_image",
+        "camera_screensaver_unavailable",
+        "camera_screensaver_loading",
+    )
+    for symbol in disabled_symbols:
+        if re.search(rf"\b{re.escape(symbol)}\b", disabled):
+            errors.append(
+                f"common/device/screen_camera_screensaver_disabled.yaml: unresolved camera resource {symbol}"
+            )
+    for script_id in ("camera_screensaver_refresh_image", "camera_screensaver_adopt_transition_generation"):
+        if yaml_script_body(disabled, script_id) is None:
+            errors.append(
+                f"common/device/screen_camera_screensaver_disabled.yaml: missing no-op {script_id} boundary"
+            )
+    disabled_generation_body = yaml_script_body(
+        disabled, "camera_screensaver_adopt_transition_generation"
+    )
+    if disabled_generation_body is not None and "parameters:\n      generation: int" not in disabled_generation_body:
+        errors.append(
+            "common/device/screen_camera_screensaver_disabled.yaml: preserve transition-generation script signature"
+        )
+    return errors
+
+
 def run_scan() -> int:
     errors = firmware_ha_binding_errors(FIRMWARE_DIR, ROOT)
     errors.extend(firmware_display_controller_ownership_errors(DISPLAY_LIFECYCLE_ROOTS, ROOT))
@@ -3797,6 +3903,7 @@ def run_scan() -> int:
     errors.extend(firmware_unavailable_retry_errors(FIRMWARE_DIR, CORE_INFRA_PATH, ROOT))
     errors.extend(firmware_cover_request_errors(FIRMWARE_DIR, CORE_INFRA_PATH, ROOT))
     errors.extend(firmware_cover_art_external_input_errors(COVER_ART_PATH, ROOT))
+    errors.extend(firmware_camera_resource_boundary_errors(ROOT))
     errors.extend(firmware_cover_art_stale_image_errors(COVER_ART_PATH, ROOT))
     errors.extend(firmware_cover_art_refresh_errors(COVER_ART_PATH, ROOT))
     errors.extend(firmware_cover_art_playback_grace_errors(COVER_ART_PATH, ROOT))
@@ -4852,6 +4959,23 @@ def expect_camera_screensaver_retained_token_errors(
             assert not errors, f"{name}: expected no errors, got {errors!r}"
 
 
+def expect_camera_resource_boundary_errors(
+    name: str, files: dict[str, str], expected: tuple[str, ...]
+) -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for filename, text in files.items():
+            path = root / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+        errors = firmware_camera_resource_boundary_errors(root)
+        for item in expected:
+            assert any(item in error for error in errors), f"{name}: missing {item!r} in {errors!r}"
+        if not expected:
+            assert not errors, f"{name}: expected no errors, got {errors!r}"
+
+
 def run_self_test() -> int:
     valid_touch_wake = (
         "touchscreen:\n"
@@ -5015,6 +5139,93 @@ def run_self_test() -> int:
             'esphome::artwork_image::ImageResizeMode::COVER\n', ''
         ),
         ("map the camera Fit and Fill options",),
+    )
+    valid_camera_resource_boundary = {
+        "common/config/display.yaml":
+            "- script.execute: camera_screensaver_refresh_image\n",
+        "common/device/screen_cover_art.yaml":
+            "id(camera_screensaver_refresh_image).execute();\n",
+        "common/addon/backlight.yaml":
+            "id(camera_screensaver_adopt_transition_generation).execute(\n",
+        "common/device/screen_camera_screensaver.yaml": (
+            "  - id: camera_screensaver_refresh_image\n"
+            "    mode: restart\n"
+            "    then:\n"
+            "      - lambda: 'id(camera_screensaver_downloaded_image)->cancel_update();'\n"
+            "      - script.execute: camera_screensaver_request_image\n"
+            "  - id: camera_screensaver_adopt_transition_generation\n"
+            "    mode: restart\n"
+            "    parameters:\n"
+            "      generation: int\n"
+            "    then:\n"
+            "      - lambda: |-\n"
+            "          id(camera_screensaver_transition_generation) =\n"
+            "              static_cast<uint32_t>(generation);\n"
+        ),
+        "common/device/screen_camera_screensaver_disabled.yaml": (
+            "  - id: camera_screensaver_refresh_image\n"
+            "    mode: restart\n"
+            "    then: []\n"
+            "  - id: camera_screensaver_adopt_transition_generation\n"
+            "    mode: restart\n"
+            "    parameters:\n"
+            "      generation: int\n"
+            "    then: []\n"
+        ),
+    }
+    expect_camera_resource_boundary_errors(
+        "camera optional-resource script boundary",
+        valid_camera_resource_boundary,
+        (),
+    )
+    expect_camera_resource_boundary_errors(
+        "camera shared handler does not reach optional image resource",
+        {
+            **valid_camera_resource_boundary,
+            "common/config/display.yaml": (
+                "- lambda: 'id(camera_screensaver_downloaded_image)->cancel_update();'\n"
+                "- script.execute: camera_screensaver_request_image\n"
+            ),
+        },
+        ("keep optional camera resource",),
+    )
+    expect_camera_resource_boundary_errors(
+        "camera disabled package has no optional image resource",
+        {
+            **valid_camera_resource_boundary,
+            "common/device/screen_camera_screensaver_disabled.yaml": (
+                valid_camera_resource_boundary[
+                    "common/device/screen_camera_screensaver_disabled.yaml"
+                ]
+                + "# camera_screensaver_downloaded_image\n"
+            ),
+        },
+        ("unresolved camera resource",),
+    )
+    expect_camera_resource_boundary_errors(
+        "camera refresh preserves cancel-before-request ordering",
+        {
+            **valid_camera_resource_boundary,
+            "common/device/screen_camera_screensaver.yaml": valid_camera_resource_boundary[
+                "common/device/screen_camera_screensaver.yaml"
+            ].replace(
+                "      - lambda: 'id(camera_screensaver_downloaded_image)->cancel_update();'\n"
+                "      - script.execute: camera_screensaver_request_image\n",
+                "      - script.execute: camera_screensaver_request_image\n"
+                "      - lambda: 'id(camera_screensaver_downloaded_image)->cancel_update();'\n",
+            ),
+        },
+        ("preserve camera cancel-before-request ordering",),
+    )
+    expect_camera_resource_boundary_errors(
+        "camera transition-generation operation remains enabled",
+        {
+            **valid_camera_resource_boundary,
+            "common/device/screen_camera_screensaver.yaml": valid_camera_resource_boundary[
+                "common/device/screen_camera_screensaver.yaml"
+            ].replace("camera_screensaver_transition_generation", "camera_generation"),
+        },
+        ("preserve camera transition-generation update",),
     )
     expect_media_cover_art_external_input_errors(
         "missing media cover art external-input handling",
