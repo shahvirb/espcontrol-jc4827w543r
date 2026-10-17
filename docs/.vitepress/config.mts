@@ -351,7 +351,14 @@ export default defineConfig({
             ],
           },
           { text: '4.3-inch JC4827W543R', link: '/screens/jc4827w543r' },
-          { text: '4.3-inch JC4880P443', link: '/screens/jc4880p443' },
+          {
+            text: '4.3-inch JC4880P443',
+            collapsed: true,
+            items: [
+              { text: 'Original', link: '/screens/jc4880p443' },
+              { text: 'V3', link: '/screens/jc4880p443-v3' },
+            ],
+          },
           { text: '4-inch ESP32-P4 86', link: '/screens/p4-86' },
           { text: '4-inch 4848S040', link: '/screens/4848s040' },
           { text: 'Printable Stands', link: '/reference/3d-printable-stands' },
@@ -424,7 +431,6 @@ export default defineConfig({
           { text: 'Factory Reset', link: '/features/backup#reset-the-display' },
           { text: 'Firmware', link: '/features/firmware-updates' },
           { text: 'Built-in Relays', link: '/features/relays' },
-          { text: 'Voice Control', link: '/features/voice-control' },
         ],
       },
       {
@@ -445,7 +451,6 @@ export default defineConfig({
         items: [
           { text: 'Manual Setup', link: '/getting-started/manual-esphome-setup' },
           { text: 'Wifi Issues', link: '/getting-started/c6-recovery' },
-          { text: 'Collect USB Logs', link: '/reference/collect-usb-logs' },
         ],
       },
       {
@@ -461,6 +466,7 @@ export default defineConfig({
         text: 'Community',
         items: [
           { text: 'Contributing', link: '/reference/contributing' },
+          { text: 'Collect USB Logs', link: '/reference/collect-usb-logs' },
         ],
       },
       {

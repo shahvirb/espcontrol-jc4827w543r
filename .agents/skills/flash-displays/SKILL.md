@@ -1,13 +1,13 @@
 ---
 name: flash-displays
-description: Flash EspControl display firmware from this repository using ESPHome. Use when the user invokes /flash-displays with no extra display name, or asks to flash, reflash, update, or upload firmware to all known displays in sequence, or to a specific display such as 7inch, 7-inch P4, 10inch, 10-inch V1, 10-inch V2, JC4827W543R, P4-86, 4.3-inch P4, 4-inch P4, or S3, over an explicitly supplied OTA target or USB serial device.
+description: Flash EspControl display firmware from this repository using ESPHome. Use when the user invokes /flash-displays with no extra display name, or asks to flash, reflash, update, or upload firmware to all known displays in sequence, or to a specific display such as 7inch, 7-inch P4, 10inch, 10-inch V1, 10-inch V2, 10-inch V3, JC4827W543R over USB, P4-86, 4.3-inch P4, 4-inch P4, or S3, over an explicitly supplied OTA target or USB.
 ---
 
 # Flash Displays
 
 ## Overview
 
-Use the local development ESPHome configs to flash the known EspControl displays. If the user invokes `/flash-displays` with no additional display name or target, assume they mean all displays. Flash one requested display, or flash all displays in the fixed order below. Use OTA with the default hard-coded target unless the user provides a different target; use USB only when the user explicitly asks for USB.
+Use the local development ESPHome configs in the active repository worktree to flash the known EspControl displays. If the user invokes `/flash-displays` with no additional display name or target, assume they mean all displays. Flash one requested display, or flash all displays in the fixed order below. Use OTA with the default hard-coded target unless the user provides a different target; use USB only when the user explicitly asks for USB.
 
 ## Device Map
 
@@ -15,36 +15,46 @@ Use the local development ESPHome configs to flash the known EspControl displays
 |---|---|---|
 | `7inch`, `7-inch`, `7inch P4`, `7-inch P4`, `7inch V1`, `7-inch V1`, `JC1060P470` | `devices/guition-esp32-p4-jc1060p470` | `192.168.6.102` |
 | `7inch V2`, `7-inch V2`, `JC1060P470 V2` | `devices/guition-esp32-p4-jc1060p470-v2` | Ask for the target |
-| `10inch`, `10-inch`, `10inch P4`, `10-inch P4`, `10inch V1`, `10-inch V1`, `JC8012P4A1` | `devices/guition-esp32-p4-jc8012p4a1` | `192.168.6.103` |
+| `10inch`, `10-inch`, `10inch P4`, `10-inch P4`, `10inch V3`, `10-inch V3`, `JC8012P4A1`, `JC8012P4A1 V3` | `devices/guition-esp32-p4-jc8012p4a1-v3` | `192.168.6.103` |
+| `10inch V1`, `10-inch V1`, `JC8012P4A1 V1` | `devices/guition-esp32-p4-jc8012p4a1` | Ask for the target |
 | `10inch V2`, `10-inch V2`, `JC8012P4A1 V2` | `devices/guition-esp32-p4-jc8012p4a1-v2` | Ask for the target |
 | `4inch P4`, `4-inch P4`, `P4-86`, `86 Panel`, `Waveshare P4-86`, `esp32-p4-86` | `devices/esp32-p4-86` | `192.168.6.104` |
 | `4.3inch P4`, `4.3-inch P4`, `P4 4.3inch`, `P4 4.3-inch`, `JC4880P443` | `devices/guition-esp32-p4-jc4880p443` | `192.168.6.101` |
-| `JC4827W543R`, `JC4827`, `4.3-inch JC4827` | `devices/guition-jc4827w543r` | Ask for the target |
+| `JC4827W543R`, `JC4827`, `4.3-inch JC4827` | `devices/guition-jc4827w543r` | USB only (no OTA) |
 | `S3`, `4inch S3`, `4-inch S3`, `4848S040` | `devices/guition-esp32-s3-4848s040` | `192.168.6.105` |
 
-Treat the JC4827W543R as distinct from the JC4880P443. The JC4827 row is the
-Guition 4.3-inch ESP32-S3 panel in `devices/guition-jc4827w543r`; it has no
-default OTA target, so require an explicit OTA target or USB device.
+Treat the JC4827W543R as USB-only. Use `devices/guition-jc4827w543r`; its 4 MB single-app partition has no OTA path. Never assign or request an OTA target for this device; require an explicit local USB device.
 
 Treat the 7-inch panel at `192.168.6.102`, and an ambiguous or default `7inch` request, as V1 hardware. Always flash that panel with the V1 `JC1060P470` configuration in `devices/guition-esp32-p4-jc1060p470`; never substitute the V2 configuration because that firmware will not work on this panel. Select the V2 directory only when the user explicitly requests the 7-inch V2 panel and supplies a different OTA target or explicitly requests USB.
 
-Treat the 10-inch panel at `192.168.6.103`, and an ambiguous or default `10inch` request, as V1 hardware. Always flash that panel with the V1 `JC8012P4A1` configuration in `devices/guition-esp32-p4-jc8012p4a1`; never substitute the V2 configuration because that firmware will not work on this panel. Select the V2 directory only when the user explicitly requests the 10-inch V2 panel and supplies a different OTA target or explicitly requests USB.
+Treat the 10-inch panel at `192.168.6.103`, and an ambiguous or default `10inch` request, as V3 hardware. Always flash that panel with the V3 `JC8012P4A1` configuration in `devices/guition-esp32-p4-jc8012p4a1-v3`. Use the V1 or V2 directories only when the user explicitly requests that version; ask for a different OTA target or USB when one is not supplied.
 
-All screens can also be flashed over USB when explicitly requested. Use the selected screen's config directory and the exact local serial target supplied by the user. On Linux, common targets are `/dev/ttyACM0` and `/dev/ttyUSB0`; on macOS, common targets are `/dev/cu.usbmodem*`. Device paths are case-sensitive; `/dev/ttyACM0` is valid, while `/dev/tty/acm0` is not.
+All screens can also be flashed over USB when explicitly requested. Use the selected screen's config directory and the local serial target, normally `/dev/cu.usbmodem201301`.
 
 If the user says only `4inch` or `4-inch`, ask whether they mean the 4-inch P4 screen or the S3 screen.
 
 For `/flash-displays` with no extra target, or for `all`, flash in this sequence by default over OTA using the default targets above:
 
 1. 7-inch P4 V1.
-2. 10-inch P4 V1.
+2. 10-inch P4 V3.
 3. 4-inch P4 / P4-86.
 4. 4.3-inch P4.
 5. S3.
 
-The JC4827W543R is not included in the automatic `all` sequence because it
-has no default OTA target. Flash it only when the user names it and supplies
-an OTA target or an explicit USB device.
+The JC4827W543R is excluded from the automatic `all` sequence because it is USB-only and requires its backup gate. Flash it only when the user names it and explicitly selects USB.
+
+## USB Backup Gate
+
+Treat a USB upload to the JC4827W543R as potentially affecting persistent panel
+state. Its 4 MB single-app configuration has no OTA path, and a successful
+upload confirms firmware transfer only; it does not confirm that saved panel
+configuration survived.
+
+Before any JC4827W543R USB flash:
+
+1. Tell the user to open **Setup > Settings > Backup > Export** and save the backup file.
+2. Require the user's explicit confirmation that the backup is complete before invoking ESPHome.
+3. After a successful upload, tell the user to open **Setup > Settings > Backup > Import** and select the saved file. Backups do not restore Wi-Fi credentials or the Home Assistant encryption key; reconnect Wi-Fi and re-pair Home Assistant when required.
 
 ## YAML Selection
 
@@ -54,65 +64,66 @@ Use `dev.yaml` by default. If the user names another YAML file, use that file in
 - If the user gives a bare filename such as `esphome.yaml`, resolve it inside the selected display's config directory.
 - If the user gives a repo-relative path such as `devices/guition-esp32-p4-jc8012p4a1/esphome.yaml`, resolve it from the repository root.
 - For the 7-inch panel at `192.168.6.102`, or an ambiguous/default 7-inch request, require the selected YAML to resolve inside `devices/guition-esp32-p4-jc1060p470`, which is the V1 configuration. Allow `devices/guition-esp32-p4-jc1060p470-v2` only when the user explicitly requests V2 and supplies a different OTA target or explicitly requests USB; otherwise stop and clarify instead of flashing it.
-- For the 10-inch panel at `192.168.6.103`, or an ambiguous/default 10-inch request, require the selected YAML to resolve inside `devices/guition-esp32-p4-jc8012p4a1`, which is the V1 configuration. Allow `devices/guition-esp32-p4-jc8012p4a1-v2` only when the user explicitly requests V2 and supplies a different OTA target or explicitly requests USB; otherwise stop and clarify instead of flashing it.
+- For the 10-inch panel at `192.168.6.103`, or an ambiguous/default 10-inch request, require the selected YAML to resolve inside `devices/guition-esp32-p4-jc8012p4a1-v3`, which is the V3 configuration. Allow the V1 or V2 directories only when the user explicitly requests that version and supplies a different OTA target or explicitly requests USB; otherwise stop and clarify instead of flashing it.
 - Only use YAML files inside this repository. If the selected file does not exist, ask for the correct file instead of guessing.
 - Use the required local secrets file described below. Do not create secret values or print, modify, copy, or commit the file contents.
 
 ## Secrets File
 
-All development YAML files require a local `secrets.yaml` containing
-`wifi_ssid` and `wifi_password`. Use the existing local file or symlink in the
-selected display's config directory. Do not assume a maintainer-specific
-absolute path.
+All development YAML files require a local `secrets.yaml` containing `wifi_ssid` and `wifi_password`. Always use this existing local file as the only secrets source:
+
+```text
+${ESPCONTROL_SECRETS:-<main-checkout>/secrets.yaml}
+```
+
+Resolve the active and main checkout paths dynamically before using secrets or
+device configs. The `ESPCONTROL_SECRETS` override is optional:
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+COMMON_GIT_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)"
+MAIN_CHECKOUT="$(dirname "$COMMON_GIT_DIR")"
+SECRETS_SOURCE="${ESPCONTROL_SECRETS:-$MAIN_CHECKOUT/secrets.yaml}"
+```
 
 Before flashing each selected display:
 
-1. From the selected display's config directory, verify `test -f secrets.yaml`.
-2. If it is missing or the symlink is broken, stop and ask the user for the approved local secrets location; do not create or guess secret values.
-3. If it already exists, leave it unchanged and use it as-is. Never replace a file or symlink automatically.
+1. Confirm the source exists with `test -f "$SECRETS_SOURCE"`. If it is missing, stop and tell the user; do not create or guess secret values.
+2. Run the following from the selected display's config directory. This creates the ignored local symlink only when `secrets.yaml` is absent, and verifies that any existing file or symlink resolves to the required source:
+
+   ```bash
+   if [ ! -e secrets.yaml ] && [ ! -L secrets.yaml ]; then
+     ln -s "$SECRETS_SOURCE" secrets.yaml
+   fi
+   test "$(realpath secrets.yaml)" = "$(realpath "$SECRETS_SOURCE")"
+   ```
+
+3. If verification fails, stop and explain that the selected display already has a different `secrets.yaml`; do not replace it without the user's approval.
 
 Never display the secrets file, include its contents in command output, or add it to Git. The per-device `.gitignore` files exclude `secrets.yaml`.
-
-## USB Backup Gate
-
-Treat a USB upload with the local ESPHome `run` flow as destructive to
-persistent panel state. The merged firmware image can erase the NVS range
-while writing the application, even when no explicit full-erase option was
-passed. On the JC4827W543R, the saved EspControl configuration and Home
-Assistant API key live in that storage.
-
-Before any USB flash:
-
-1. Tell the user to open **Setup > Settings > Backup > Export** and save the backup file.
-2. Require the user's explicit confirmation that the backup is complete before invoking ESPHome.
-3. State that an upload-success result does not mean the saved app configuration survived.
-
-After a successful USB flash, tell the user to open **Setup > Settings > Backup > Import** and select the saved file. Backups restore the panel configuration but not Wi-Fi credentials or the Home Assistant encryption key; reconnect Wi-Fi and re-pair Home Assistant when required. OTA updates normally preserve this storage and do not use this USB backup gate.
 
 ## Workflow
 
 1. Confirm the repository state:
    - Run `git status --short --branch`.
-   - Use the current checkout as the source. If it is not `main`, report the branch and do not switch branches or pull automatically; flashing a just-built fix must use the checkout the user selected.
+   - Flash the currently selected worktree and branch. Do not switch branches or pull another branch as part of flashing.
    - If the worktree is dirty, do not revert or commit unrelated changes. Tell the user the flash will use the current local checkout as-is.
 2. Resolve the requested display names from the device map. If the user invoked `/flash-displays` without naming a display, resolve it as `all`. If the request is ambiguous, ask one short clarification.
 3. Resolve the YAML file from the user's request. If none is provided, use `dev.yaml`.
 4. Prepare and verify the required local `secrets.yaml` symlink in each selected display's config directory by following the Secrets File section. Do not print or commit the secrets.
 5. Resolve OTA targets from an explicit user-supplied target first, then from the device's default hard-coded target. If a needed OTA target is missing, ask for that target or ask whether to use USB.
 6. If the user says `USB`, `over USB`, `use USB`, `local`, or similar, use USB for the selected display instead of OTA.
-   - For a single display, use that display's config directory and the exact USB target.
+   - For a single display, use that display's config directory and the USB target.
    - For `all over USB`, flash the displays in the normal all-display sequence, but ask the user to connect the correct display before each USB flash if the connected device is not clearly identifiable.
 7. For OTA targets, check reachability first with `ping -c 2 -W 1000 <target>`.
 8. For USB flashing:
-   - If the user supplied a target, verify that exact path first and use that same path for upload when it is readable and writable; do not silently normalize or substitute it.
    - On Linux, inspect `/dev/ttyACM*` and `/dev/ttyUSB*` when no target was supplied.
    - On macOS, inspect `/dev/cu.usbmodem*` when no target was supplied.
-   - If there is no clear port, ask the user to connect the display or choose the port.
-9. If using USB, complete the USB Backup Gate and receive explicit backup confirmation before compiling or uploading.
+   - If there is no clear USB port, ask the user to connect the display or choose the port.
+9. For a JC4827W543R USB flash, complete the USB Backup Gate and receive explicit backup confirmation before compiling or uploading.
 10. Flash each selected display with the command below, running displays sequentially. Do not run multiple flashes in parallel.
 11. After each OTA flash, ping the target again. A first ping may fail during reboot; retry once after a short delay before reporting a problem.
-12. After each USB flash, report the upload result separately from configuration restoration and repeat the Backup > Import instructions.
-13. Do not commit or push for flashing alone. Commit/push only if this skill or other source files were intentionally changed as part of the user request.
+12. Do not commit or push for flashing alone. Commit/push only if this skill or other source files were intentionally changed as part of the user request.
 
 ## Commands
 
@@ -125,51 +136,53 @@ repository checkout:
 python3 scripts/local_esphome.py <yaml-file> run --device <target> --no-logs
 ```
 
-Run from the appropriate config directory:
+Resolve the active repository root with `git rev-parse --show-toplevel`, then
+run from each appropriate config directory under that root. These examples
+work from any linked worktree:
 
 ```bash
 # JC4827W543R over USB on Linux; require a completed backup first
-cd devices/guition-jc4827w543r
+cd "$REPO_ROOT/devices/guition-jc4827w543r"
 python3 ../../scripts/local_esphome.py dev.yaml run --device /dev/ttyACM0 --no-logs
 
 # 7-inch P4 over OTA
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-p4-jc1060p470
+cd "$REPO_ROOT/devices/guition-esp32-p4-jc1060p470"
 python3 ../../scripts/local_esphome.py dev.yaml run --device 192.168.6.102 --no-logs
 
 # 7-inch P4 over USB, only when explicitly requested
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-p4-jc1060p470
+cd "$REPO_ROOT/devices/guition-esp32-p4-jc1060p470"
 python3 ../../scripts/local_esphome.py dev.yaml run --device /dev/cu.usbmodem201301 --no-logs
 
-# 10-inch P4 V1 over OTA
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-p4-jc8012p4a1
+# 10-inch P4 V3 over OTA
+cd "$REPO_ROOT/devices/guition-esp32-p4-jc8012p4a1-v3"
 python3 ../../scripts/local_esphome.py dev.yaml run --device 192.168.6.103 --no-logs
 
-# 10-inch P4 V1 over USB, only when explicitly requested
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-p4-jc8012p4a1
+# 10-inch P4 V3 over USB, only when explicitly requested
+cd "$REPO_ROOT/devices/guition-esp32-p4-jc8012p4a1-v3"
 python3 ../../scripts/local_esphome.py dev.yaml run --device /dev/cu.usbmodem201301 --no-logs
 
 # 4-inch P4 / P4-86 over OTA
-cd /Users/jtenniswood/Git/espcontrol/devices/esp32-p4-86
+cd "$REPO_ROOT/devices/esp32-p4-86"
 python3 ../../scripts/local_esphome.py dev.yaml run --device 192.168.6.104 --no-logs
 
 # 4-inch P4 / P4-86 over USB, only when explicitly requested
-cd /Users/jtenniswood/Git/espcontrol/devices/esp32-p4-86
+cd "$REPO_ROOT/devices/esp32-p4-86"
 python3 ../../scripts/local_esphome.py dev.yaml run --device /dev/cu.usbmodem201301 --no-logs
 
 # 4.3-inch P4 over OTA
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-p4-jc4880p443
+cd "$REPO_ROOT/devices/guition-esp32-p4-jc4880p443"
 python3 ../../scripts/local_esphome.py dev.yaml run --device 192.168.6.101 --no-logs
 
 # 4.3-inch P4 over USB, only when explicitly requested
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-p4-jc4880p443
+cd "$REPO_ROOT/devices/guition-esp32-p4-jc4880p443"
 python3 ../../scripts/local_esphome.py dev.yaml run --device /dev/cu.usbmodem201301 --no-logs
 
 # S3 over OTA
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-s3-4848s040
+cd "$REPO_ROOT/devices/guition-esp32-s3-4848s040"
 python3 ../../scripts/local_esphome.py dev.yaml run --device 192.168.6.105 --no-logs
 
 # S3 over USB, only when explicitly requested
-cd /Users/jtenniswood/Git/espcontrol/devices/guition-esp32-s3-4848s040
+cd "$REPO_ROOT/devices/guition-esp32-s3-4848s040"
 python3 ../../scripts/local_esphome.py dev.yaml run --device /dev/cu.usbmodem201301 --no-logs
 
 ```
@@ -180,5 +193,5 @@ Keep user updates concise:
 
 - Say which display is currently compiling/uploading.
 - Mention known ESPHome warnings only if they affect the result; framework, platform, GPIO19/GPIO20, and MIPI narrowing warnings are normally non-blocking.
-- For USB, distinguish firmware upload success from app-configuration restoration; remind the user to import the backup and reconnect or re-pair services as needed.
+- For JC4827W543R USB, distinguish firmware upload success from panel-configuration restoration and remind the user to import the backup and reconnect or re-pair services as needed.
 - Final response: list each requested display as flashed successfully, or clearly identify the display that failed and the blocking symptom.

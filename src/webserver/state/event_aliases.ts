@@ -25,6 +25,7 @@ export const SSE_ALIAS_GROUPS = {
   mediaPlayerSleepPrevention: ["switch-screen_saver__media_player_sleep_prevention", "switch-screen_saver_media_player_sleep_prevention", "switch-media_player_sleep_prevention_enabled"],
   mediaPlayerSleepPreventionEntity: ["text-media_player_sleep_prevention_entity"],
   coverArt: ["switch-screen_saver__cover_art", "switch-screen_saver_cover_art", "switch-screensaver_cover_art"],
+  clockDate: ["switch-screen_saver__show_date", "switch-screen_saver_show_date", "switch-clock_screensaver_show_date"],
   clockOverlay: ["switch-screen_saver__clock_overlay", "switch-screen_saver_clock_overlay", "switch-clock_overlay_enabled"],
   metadataOverlay: ["switch-screen_saver__metadata_overlay", "switch-screen_saver_metadata_overlay", "switch-metadata_overlay_enabled"],
   coverArtEntity: ["text-screen_saver__cover_art_entity", "text-screen_saver_cover_art_entity", "text-cover_art_media_player_entity"],
@@ -35,8 +36,10 @@ export const SSE_ALIAS_GROUPS = {
   coverArtHideExternalInput: ["switch-screen_saver__hide_cover_art_on_external_input", "switch-screen_saver_hide_cover_art_on_external_input", "switch-hide_cover_art_on_external_input", "switch-cover_art_hide_external_input", "switch-screen_saver__hide_for_external_sources"],
   homeAssistantArtworkProtocol: ["select-home_assistant_artwork_protocol", "select-cover_art_home_assistant_artwork_protocol"],
   homeAssistantArtworkPort: ["number-home_assistant_artwork_port"],
+  homeAssistantArtworkHost: ["text-home_assistant_artwork_host"],
   homeAssistantArtworkEndpointMode: ["select-home_assistant_artwork_endpoint_mode", "select-home_assistant_artwork_connection"],
   homeAssistantArtworkEndpointStatus: ["text_sensor-home_assistant_artwork_endpoint_status", "text_sensor-home_assistant_artwork_endpoint"],
+  homeAssistantArtworkEndpointHealth: ["text_sensor-home_assistant_artwork_endpoint_health", "text_sensor-home_assistant_artwork_connection_health"],
   scheduleTrigger: ["text-screen__schedule_trigger", "text-screen_schedule_trigger", "text-schedule_trigger"],
   scheduleSensorActivation: ["select-screen__schedule_sensor_activation", "select-screen_schedule_sensor_activation", "select-schedule_sensor_activation"],
   scheduleWakeTimeout: ["number-screen__schedule_wake_timeout", "number-screen_schedule_wake_timeout", "number-schedule_wake_timeout"],
@@ -82,6 +85,7 @@ export function applySseHandlerAliases(handlers: SseHandlers): void {
   addSseAliases(handlers, SSE_ALIAS_GROUPS.mediaPlayerSleepPrevention, "switch-screen_saver__media_player_sleep_prevention");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.mediaPlayerSleepPreventionEntity, "text-media_player_sleep_prevention_entity");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.coverArt, "switch-screen_saver__cover_art");
+  addSseAliases(handlers, SSE_ALIAS_GROUPS.clockDate, "switch-screen_saver__show_date");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.clockOverlay, "switch-screen_saver__clock_overlay");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.metadataOverlay, "switch-screen_saver__metadata_overlay");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.coverArtEntity, "text-screen_saver__cover_art_entity");
@@ -92,8 +96,10 @@ export function applySseHandlerAliases(handlers: SseHandlers): void {
   addSseAliases(handlers, SSE_ALIAS_GROUPS.coverArtHideExternalInput, "switch-screen_saver__hide_cover_art_on_external_input");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.homeAssistantArtworkProtocol, "select-home_assistant_artwork_protocol");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.homeAssistantArtworkPort, "number-home_assistant_artwork_port");
+  addSseAliases(handlers, SSE_ALIAS_GROUPS.homeAssistantArtworkHost, "text-home_assistant_artwork_host");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.homeAssistantArtworkEndpointMode, "select-home_assistant_artwork_endpoint_mode");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.homeAssistantArtworkEndpointStatus, "text_sensor-home_assistant_artwork_endpoint_status");
+  addSseAliases(handlers, SSE_ALIAS_GROUPS.homeAssistantArtworkEndpointHealth, "text_sensor-home_assistant_artwork_endpoint_health");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.scheduleTrigger, "text-screen__schedule_trigger");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.scheduleSensorActivation, "select-screen__schedule_sensor_activation");
   addSseAliases(handlers, SSE_ALIAS_GROUPS.scheduleWakeTimeout, "number-screen__schedule_wake_timeout");

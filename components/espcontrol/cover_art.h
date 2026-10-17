@@ -10,6 +10,7 @@
 #include <string>
 
 #include "artwork_controller.h"
+#include "media_display_text.h"
 
 // Defined by the firmware Home Assistant transport. Keeping this declaration
 // lightweight lets host-side Cover Art tests use the controller without
@@ -338,14 +339,14 @@ class PlaybackControl {
 struct PolicyInput {
   bool enabled{false}, media_playing{false}, entity_configured{false};
   bool attribute_conditions_match{true}, hide_external_input{false}, external_input_active{false};
-  bool schedule_blocks{false}, alarm_takeover_active{false}, voice_interaction_active{false};
+  bool schedule_blocks{false}, alarm_takeover_active{false};
 };
 inline bool policy_allows_feature(const PolicyInput &i) {
   return i.enabled && i.entity_configured && i.attribute_conditions_match && !(i.hide_external_input && i.external_input_active);
 }
 inline bool policy_allows_download(const PolicyInput &i) { return policy_allows_feature(i); }
 inline bool policy_allows_display(const PolicyInput &i) {
-  return policy_allows_feature(i) && i.media_playing && !i.schedule_blocks && !i.alarm_takeover_active && !i.voice_interaction_active;
+  return policy_allows_feature(i) && i.media_playing && !i.schedule_blocks && !i.alarm_takeover_active;
 }
 inline bool feature_allowed(bool enabled, bool entity_configured, bool conditions_match,
                             bool hide_external_input, bool external_input_active) {
@@ -360,7 +361,7 @@ inline bool feature_allowed(bool enabled, bool entity_configured, bool condition
 inline bool display_allowed(bool enabled, bool media_playing, bool entity_configured,
                             bool conditions_match, bool hide_external_input,
                             bool external_input_active, bool schedule_blocks,
-                            bool alarm_active, bool voice_active) {
+                            bool alarm_active) {
   PolicyInput input;
   input.enabled = enabled;
   input.media_playing = media_playing;
@@ -370,7 +371,6 @@ inline bool display_allowed(bool enabled, bool media_playing, bool entity_config
   input.external_input_active = external_input_active;
   input.schedule_blocks = schedule_blocks;
   input.alarm_takeover_active = alarm_active;
-  input.voice_interaction_active = voice_active;
   return policy_allows_display(input);
 }
 
@@ -382,8 +382,10 @@ struct Layout {
   int title_max_lines{0};
 };
 inline bool rotation_is_landscape(const std::string &slug, const std::string &rotation) {
-  return slug == "guition-esp32-p4-jc4880p443" ? rotation == "90" || rotation == "270"
-                                                : rotation == "0" || rotation == "180";
+  const bool portrait_panel = slug == "guition-esp32-p4-jc4880p443" ||
+                              slug == "guition-esp32-p4-jc4880p443-v3";
+  return portrait_panel ? rotation == "90" || rotation == "270"
+                        : rotation == "0" || rotation == "180";
 }
 inline Layout cover_art_layout(const std::string &slug, const std::string &rotation,
                                int screen_width, int screen_height, int art_size, int title_height) {
@@ -391,7 +393,7 @@ inline Layout cover_art_layout(const std::string &slug, const std::string &rotat
   if (slug == "guition-esp32-p4-jc1060p470" || slug == "guition-esp32-p4-jc1060p470-v2") return landscape
     ? Layout{1024,600,0,0,600,585,0,439,600,615,24,377,440,332,0,true,4}
     : Layout{600,1024,0,0,600,0,600,600,424,30,634,540,360,162,0,true};
-  if (slug == "guition-esp32-p4-jc4880p443") return landscape
+  if (slug == "guition-esp32-p4-jc4880p443" || slug == "guition-esp32-p4-jc4880p443-v3") return landscape
     ? Layout{800,480,0,0,480,480,0,320,480,504,34,272,330,207,0,true,3}
     : Layout{480,800,0,0,480,0,480,480,320,24,514,324,262,130,0,true};
   if (slug == "guition-esp32-p4-jc8012p4a1" || slug == "guition-esp32-p4-jc8012p4a1-v2" ||
@@ -410,7 +412,10 @@ struct PlaybackButtonLayout {
 inline PlaybackButtonLayout playback_button_layout(const Layout &layout, int title_line_height = 0,
                                                    int title_line_space = 0) {
   const int short_side = std::min(layout.screen_width, layout.screen_height);
-  const int size = std::clamp(short_side / 5, 80, 112);
+  const int default_size = std::clamp(short_side / 5, 80, 112);
+  const int size = layout.screen_width == 720 && layout.screen_height == 720
+      ? 144
+      : short_side == 480 && layout.split ? 112 : default_size;
   const int margin = std::clamp(short_side / 20, 24, 40);
   int width = layout.panel_width;
   int height = layout.panel_height;

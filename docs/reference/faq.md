@@ -26,7 +26,7 @@ Supported families are Guition 4848S040, **JC4827W543R** (4.3-inch, 480x272 land
 
 ### Should I Choose the S3 or a P4 Screen?
 
-Choose S3 for a compact, lower-cost panel; choose P4 for more image slots or a larger screen. P4 86 also supports voice. Compare [capacity, networking, and hardware revisions](/screens/).
+Choose S3 for a compact, lower-cost panel; choose P4 for more image slots or a larger screen. Compare [capacity, networking, and hardware revisions](/screens/).
 
 ### Can I Display My Existing Home Assistant Dashboard Cards?
 
@@ -69,10 +69,6 @@ Use **Media > All Controls**, or tap a **Cover Art** card. Tabs appear according
 ### Can a Card Start a Playlist, Album, or Radio Station?
 
 Choose **Media > Track, Album or Playlist** and supply a content ID accepted by the player integration. For complex playback, run a Home Assistant script with an Action card. See [Media](/card-types/media).
-
-### Which Displays Support Voice or Play Audio Themselves?
-
-The **4-inch P4 86 Panel** supports [Home Assistant Assist voice control](/features/voice-control) and local audio with its microphones, speaker, and audio-capable firmware. Other panels' Media cards control external players.
 
 ## Cameras and photos
 
@@ -192,7 +188,7 @@ Yes, when the Home Assistant climate entity exposes those capabilities. Range th
 
 ### Can I Choose a Different Background Colour for Every Card?
 
-The current interface uses a shared **Primary** colour for active cards and fixed colours for inactive and information cards. It does not offer arbitrary per-card background colours. Change the accent in [Appearance](/features/appearance).
+Open an individual card's settings and expand **Custom Colours** to choose a preset from the compact grid, or select the final dashed eyedropper swatch to open your browser's native colour picker. A checkmark shows the selected preset; a custom colour fills the eyedropper swatch and is highlighted by an accent outline. The active state automatically uses a lighter version of that colour, and text adjusts for readability. While the section is open, the reset icon beside its arrow removes the custom colour so the card uses the panel's defaults again. Image and full QR cards use fixed backgrounds and do not offer this control. The shared active colour remains available in [Appearance](/features/appearance).
 
 ### Can I Send Blinds to 25, 50, or 75 Percent?
 

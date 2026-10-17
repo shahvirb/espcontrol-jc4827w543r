@@ -1,50 +1,36 @@
-# EspControl Device Integration
+# AGENTS.md
 
-## Goal
+## Communication
 
-Integrate display devices as first-class EspControl devices. The current device
-effort is the Guition JC4827W543R, documented at
-https://devices.esphome.io/devices/guition-jc4827543c/.
+- The user is technical but not development-oriented. Explain changes in approachable terms and avoid unnecessary implementation detail.
+- Keep final updates concise: what changed, how it was checked, and what the user needs to test.
 
-The goal is complete device integration through device addition and
-configuration, using EspControl's existing shared capabilities wherever they
-fit. Device-specific hardware and presentation needs belong in that device's
-configuration and metadata when possible. Keep universal behavior consistent
-across the supported devices; device integration is not a general redesign of
-that behavior.
+## Development workflow
 
-## Development Guidance
+- Resolve the active repository root with `git rev-parse --show-toplevel` and
+  use that worktree for repository files and commands. Do not assume the main
+  checkout's path; this repository is often used through linked worktrees.
+- Keep changes and checks in the worktree where the task was started unless a
+  workflow explicitly needs another branch or worktree.
 
-- Follow the repository's existing device patterns and use device-specific
-  configuration for hardware details such as pins, display geometry, touch,
-  fonts, layout, and defaults.
-- Follow [upstream repo](https://github.com/jtenniswood/espcontrol) conventions. Our goal is not to produce the cleanest architecture, rather we should prefer to follow upstream patterns where they exist.
-- Keep the device's manifest/catalog metadata, ESPHome packages, and generated
-  device files in sync using the repository's existing generation workflow.
-- Before implementing a shared-source behavior change, explain why the
-  capability belongs across devices, identify the affected behavior/devices,
-  and ask the human developer whether they agree. Wait for explicit agreement
-  before proceeding. If agreement is not given, keep the solution device-
-  specific or pause for direction.
-- After an approved shared change, preserve existing device behavior and
-  validate the target device plus other affected devices.
-- Validate configuration and compilation where possible. Report compile
-  validation separately from testing on the physical display and touchscreen.
-- Keep credentials and other secrets out of tracked files.
+- Treat `main` as the stable branch.
+- For normal code, firmware, configuration, UI, or documentation changes, create a short-lived branch from the latest `main`.
+- Use a separate git worktree for feature or fix work so multiple issues can be developed and tested at the same time without changing `main`.
+- Use short, descriptive branch names like `fix-display-timeout` or `update-pr-workflow`; do not include `codex` in branch names or PR titles.
+- Infer the branch name from the requested outcome unless the task is ambiguous.
+- Keep each branch focused on one bug fix, feature, device change, cleanup, or documentation change.
+- If a request starts to include unrelated work, keep the extra work out of the branch unless the user explicitly asks to include it.
+- Commit completed changes and push the branch.
+- Open a pull request marked ready for review so automated checks and review systems run, instead of merging directly to `main`.
+- Leave the pull request open until the user confirms they have tested it.
+- Do not close related GitHub issues until the user confirms the fix works.
+- Only work directly on `main` when the user explicitly asks for it, or for a tiny emergency/documentation-only change where a PR would add no value.
+- After a pull request is merged, clean up its local worktree and branch when practical.
 
+## Pull requests
 
-## Agent skills
-
-### Issue tracker
-
-Issues and specs live in GitHub Issues for `shahvirb/espcontrol-jc4827w543r`.
-See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Use the default canonical triage labels on GitHub. See
-`docs/agents/triage-labels.md`.
-
-### Domain docs
-
-This is a single-context repository. See `docs/agents/domain.md`.
+- PR descriptions should explain the purpose of the change, the practical impact, and how it was checked.
+- Include clear testing notes so the user can test the branch independently of `main`.
+- If firmware needs flashing, name the affected display or device in the PR body.
+- Distinguish automated checks from physical device testing. A compile/build pass is not the same as user-confirmed device testing.
+- Use the automated PR testing guidance as the starting point for the PR body whenever it is available.

@@ -14,7 +14,7 @@ from esphome.core import CORE, CoroPriority, coroutine_with_priority
 import os
 
 CODEOWNERS = ["@jtenniswood"]
-AUTO_LOAD = ["mdns", "json"]
+AUTO_LOAD = ["mdns", "json", "socket"]
 
 CONF_ACTION_RESPONSES = "action_responses"
 CONF_PANEL_CONFIG = "panel_config"
@@ -31,6 +31,7 @@ CONF_WEB_AUTH_PASSWORD = "web_auth_password"
 espcontrol_ns = cg.global_ns.namespace("espcontrol")
 EspControlApp = espcontrol_ns.class_("EspControlApp", cg.Component)
 PanelIdentity = espcontrol_ns.class_("PanelIdentity", cg.Component)
+ResetBoot = espcontrol_ns.namespace("reset").class_("ResetBoot", cg.Component)
 
 PANEL_CONFIG_BUTTON_SCHEMA = cv.Schema(
     {
@@ -59,12 +60,25 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ID): cv.declare_id(EspControlApp),
         cv.GenerateID("identity_id"): cv.declare_id(PanelIdentity),
+        cv.GenerateID("reset_boot_id"): cv.declare_id(ResetBoot),
         cv.Optional(CONF_ACTION_RESPONSES, default=True): cv.boolean,
         cv.Optional(CONF_PANEL_CONFIG): PANEL_CONFIG_SCHEMA,
         cv.Optional(CONF_WEB_AUTH_USERNAME, default=""): cv.string_strict,
         cv.Optional(CONF_WEB_AUTH_PASSWORD, default=""): cv.sensitive(cv.string_strict),
     }
 ).extend(cv.COMPONENT_SCHEMA)
+
+
+def _consume_endpoint_socket(config):
+    from esphome.components import socket
+
+    consume = getattr(socket, "consume_sockets", None)
+    if consume is not None:
+        consume(1, "ha_endpoint_probe")(config)
+    return config
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, _consume_endpoint_socket)
 
 
 @coroutine_with_priority(CoroPriority.DIAGNOSTICS)
@@ -86,6 +100,8 @@ async def to_code(config):
     password = web_auth.get("password", config[CONF_WEB_AUTH_PASSWORD])
     cg.add(espcontrol_ns.namespace("reset").early_startup(
         compiled_networks, username, password))
+    reset_boot = cg.new_Pvariable(config["reset_boot_id"])
+    await cg.register_component(reset_boot, {})
     identity = cg.new_Pvariable(config["identity_id"])
     await cg.register_component(identity, config)
     cg.add(identity.set_web_auth_credentials(username, password))
@@ -130,6 +146,10 @@ async def to_code(config):
     cg.add_build_flag(f"-I{comp_dir}")
     cg.add_global(cg.RawStatement(f'#include "{comp_include_dir}/clock_bar.h"'), prepend=True)
     cg.add_global(cg.RawStatement(f'#include "{comp_include_dir}/backlight.h"'), prepend=True)
+    cg.add_global(
+        cg.RawStatement('#include "esphome/components/espcontrol/theme_settings.h"'),
+        prepend=True,
+    )
     cg.add_global(cg.RawStatement(f'#include "{comp_include_dir}/cover_art.h"'), prepend=True)
     if config[CONF_ACTION_RESPONSES]:
         cg.add_define("USE_API_HOMEASSISTANT_ACTION_RESPONSES")

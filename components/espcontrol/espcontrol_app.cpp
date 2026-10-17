@@ -1,5 +1,6 @@
 #include "espcontrol_app.h"
 #include "device_reset.h"
+#include "esphome/components/artwork_image/transfer_observer.h"
 
 #include <array>
 #include <cinttypes>
@@ -27,6 +28,7 @@
 #include "panel_config_write_endpoint.h"
 #include "panel_config_http_context.h"
 #include "panel_identity_endpoint.h"
+#include "screensaver_pin_endpoint.h"
 #include "button_grid.h"
 
 extern "C" void espcontrol_register_web_server_handlers(
@@ -35,6 +37,7 @@ extern "C" void espcontrol_register_web_server_handlers(
   if (server == nullptr) return;
   espcontrol::reset::register_handlers(*server);
   espcontrol::register_panel_identity_endpoint(*server);
+  espcontrol::register_screensaver_pin_endpoint(*server);
   register_local_sensor_endpoint(*server);
   register_local_action_endpoint(*server);
   espcontrol::configuration::register_panel_config_capabilities_endpoint(*server);
@@ -222,7 +225,20 @@ void EspControlApp::apply_boot_configuration() {
 }
 
 void EspControlApp::setup() {
+  screensaver_pin().setup();
   home_assistant_endpoint_.setup();
+  esphome::artwork_image::TransferObserver::instance().set(
+      [this](const std::string &origin) -> uint32_t {
+        return home_assistant_endpoint::parse_origin(origin) == home_assistant_endpoint_.origin()
+            ? home_assistant_endpoint_.generation() : 0;
+      },
+      [this](const esphome::artwork_image::TransferNotice &notice) {
+        using Failure = esphome::artwork_image::TransferFailure;
+        home_assistant_endpoint_.report_download(
+            home_assistant_endpoint::parse_origin(notice.request.origin),
+            notice.request.endpoint_generation, notice.status,
+            notice.failure == Failure::NONE, notice.failure == Failure::TRANSPORT);
+      });
   if (core_.start()) {
     cards::set_card_runtime_registry_service(&core_.card_runtime_registry());
   } else {
@@ -361,6 +377,7 @@ void EspControlApp::loop() {
 }
 
 void EspControlApp::on_shutdown() {
+  esphome::artwork_image::TransferObserver::instance().set({}, {});
   home_assistant_endpoint_.shutdown();
   cards::set_card_runtime_registry_service(nullptr);
   core_.stop();

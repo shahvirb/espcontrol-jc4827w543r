@@ -36,6 +36,7 @@ export interface DeviceConfig {
   readonly portrait?: {
     readonly cols: number;
     readonly rows: number;
+    readonly slots?: number;
     readonly screen: {
       readonly width: string;
       readonly aspect: string;
@@ -86,6 +87,7 @@ export interface RuntimeSubpage {
   grid: number[];
   sizes: SlotSizeMap;
   backLabel?: string;
+  backColor?: string;
 }
 
 export interface AppClipboard {
@@ -144,6 +146,8 @@ export interface AppState {
   presenceEntity: string;
   screensaverCameraEntity: string;
   screensaverCameraSupported: boolean;
+  clockDateSupported: boolean;
+  clockDateOn: boolean;
   clockOverlaySupported: boolean;
   screensaverMetadataEntity: string;
   metadataOverlayOn: boolean;
@@ -161,9 +165,11 @@ export interface AppState {
   coverArtTrackOverlayDuration: number;
   coverArtHideExternalInputOn: boolean;
   homeAssistantArtworkProtocol: string;
+  homeAssistantArtworkHost: string;
   coverArtHomeAssistantPort: number;
   homeAssistantArtworkEndpointMode: string;
   homeAssistantArtworkEndpointStatus: string;
+  homeAssistantArtworkEndpointHealth: string;
   screensaverMode: string;
   _screensaverModeReceived: boolean;
   screensaverAction: string;
@@ -183,6 +189,13 @@ export interface AppState {
   brightnessDayVal: number;
   brightnessNightVal: number;
   brightnessMode: string;
+  themeMode: string;
+  themeAutoMethod: string;
+  themeActive: string;
+  themeLightStart: string;
+  themeDarkStart: string;
+  themeSunriseOffset: number;
+  themeSunsetOffset: number;
   manualBrightnessVal: number;
   brightnessDawnTime: string;
   brightnessDuskTime: string;
@@ -226,6 +239,7 @@ export interface AppState {
   firmwareChecking: boolean;
   firmwareVersionRefreshPending: boolean;
   firmwareInstallTargetVersion: string;
+  firmwareWebOtaDownloadPending: boolean;
   firmwareInstallPostPending: boolean;
   firmwareInstallStatus: string;
   firmwareInstallError: string;

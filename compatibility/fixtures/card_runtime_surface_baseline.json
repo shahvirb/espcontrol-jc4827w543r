@@ -2096,7 +2096,7 @@
         },
         "preview": {
           "available": true,
-          "fingerprint": "90d830512709efaf"
+          "fingerprint": "b31c521880c9e1ec"
         }
       },
       "firmware": {
@@ -2197,6 +2197,37 @@
       },
       "firmware": {
         "family": "PUSH"
+      },
+      "lifecycle": {
+        "subscriptions": [
+          "none"
+        ],
+        "actions": [
+          "local"
+        ],
+        "modalOwner": "none"
+      }
+    },
+    {
+      "name": "screensaver: force",
+      "sourceKind": "contract",
+      "sourceType": "screensaver",
+      "mode": "force",
+      "canonicalType": "screensaver",
+      "web": {
+        "registration": "screensaver",
+        "picker": {
+          "main": true,
+          "subpage": true,
+          "infoOnly": false
+        },
+        "preview": {
+          "available": true,
+          "fingerprint": "4b2af138327433d6"
+        }
+      },
+      "firmware": {
+        "family": "SCREENSAVER"
       },
       "lifecycle": {
         "subscriptions": [

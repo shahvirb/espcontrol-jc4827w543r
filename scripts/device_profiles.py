@@ -124,14 +124,13 @@ CANONICAL_PACKAGE_KEYS = (
     "substitutions",
     "deviceFontPackageKey",
     "touchscreenPackage",
-    "localVoiceServices",
-    "alarmDelayAudio",
     "networkCoprocessor",
     "esp32C6FirmwareUpdate",
     "ethernetSelectable",
     "extraPackages",
     "backlightPwmFrequency",
     "apiNavigateAction",
+    "apiOpenModalAction",
 )
 
 
@@ -342,6 +341,7 @@ def common_font_ids() -> set[str]:
     ids: set[str] = set()
     for path in sorted(COMMON_ASSETS.glob("*.yaml")):
         ids.update(font_ids_from(path))
+    ids.update(font_ids_from(ROOT / "common" / "device" / "screen_clock.yaml"))
     return ids
 
 
@@ -379,6 +379,12 @@ def validate_layout(slug: str, device: dict[str, Any], errors: list[str]) -> Non
 
     if "portraitCols" in layout and not is_positive_int(layout.get("portraitCols")):
         errors.append(device_error(slug, "layout.portraitCols must be a positive integer when set"))
+    if "portraitSlots" in layout:
+        portrait_slots = layout.get("portraitSlots")
+        if not is_positive_int(portrait_slots):
+            errors.append(device_error(slug, "layout.portraitSlots must be a positive integer when set"))
+        elif is_positive_int(slots) and portrait_slots > slots:
+            errors.append(device_error(slug, "layout.portraitSlots cannot exceed slots"))
 
     firmware_grid = layout.get("firmwareGrid")
     if not isinstance(firmware_grid, str) or not re.fullmatch(r"[1-9]\d*x[1-9]\d*", firmware_grid):
@@ -672,9 +678,8 @@ def validate_package(slug: str, device: dict[str, Any], errors: list[str]) -> No
         "ethernetSelectable",
         "improvSerial",
         "touchscreenPackage",
-        "localVoiceServices",
-        "alarmDelayAudio",
         "apiNavigateAction",
+        "apiOpenModalAction",
         "esp32C6FirmwareUpdate",
         "firmwareUpdateEnabled",
         "embeddedWeb",
@@ -776,6 +781,8 @@ def validate_web(slug: str, device: dict[str, Any], errors: list[str]) -> None:
             for key in ("cols", "rows"):
                 if not is_positive_int(portrait_obj.get(key)):
                     errors.append(device_error(slug, f"web.portrait.{key} must be a positive integer"))
+            if "slots" in portrait_obj and not is_positive_int(portrait_obj.get("slots")):
+                errors.append(device_error(slug, "web.portrait.slots must be a positive integer when set"))
             validate_screen_box(slug, errors, portrait_obj.get("screen"), "web.portrait.screen")
 
     topbar = require_object(slug, errors, web.get("topbar"), "web.topbar")
@@ -897,12 +904,8 @@ def web_features(profile: dict[str, Any]) -> dict[str, Any]:
             features["screenRotationDisplayOffset"] = rotation["displayOffset"]
     if profile.get("internalRelays"):
         features["internalRelays"] = copy.deepcopy(profile["internalRelays"])
-    if package.get("localVoiceServices"):
-        features["voiceServices"] = True
     if "battery" in (package.get("extraPackages") or {}):
         features["battery"] = True
-    if package.get("alarmDelayAudio"):
-        features["alarmDelayAudio"] = True
     if package.get("subpageConfigChunks"):
         features["subpageConfigChunks"] = package["subpageConfigChunks"]
     if camera_screensaver_supported(profile):
@@ -957,6 +960,7 @@ def slot_device(profile: dict[str, Any]) -> dict[str, Any]:
         "media_cover_art_title_font": fonts.get("mediaCoverArtTitle"),
         "media_cover_art_artist_font": fonts.get("mediaCoverArtArtist"),
         "volume_number_font": fonts["volumeNumber"],
+        "volume_number_compact_font": fonts.get("volumeNumberCompact"),
         "volume_label_font": fonts["volumeLabel"],
         "cover_art": copy.deepcopy(display["coverArt"]),
         "climate_card_icon_font": fonts.get("climateCardIcon"),
@@ -974,6 +978,8 @@ def slot_device(profile: dict[str, Any]) -> dict[str, Any]:
     }
     if "portraitCols" in layout:
         slot["portrait_cols"] = layout["portraitCols"]
+    if "portraitSlots" in layout:
+        slot["portrait_slots"] = layout["portraitSlots"]
     if display.get("widthCompensationPercent", 100) != 100:
         slot["width_compensation_percent"] = display["widthCompensationPercent"]
     if display.get("textWidthCompensationPercent", 100) != 100:

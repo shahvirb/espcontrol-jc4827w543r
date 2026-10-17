@@ -39,6 +39,26 @@ export function normalizeTimeOfDay(value: unknown, fallback: string): string {
   return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
 }
 
+export function normalizeThemeMode(value: unknown): string {
+  const mode = String(value || "").trim().toLowerCase();
+  if (mode === "light") return "Light";
+  if (mode === "auto" || mode === "schedule" || mode === "sun") return "Auto";
+  return "Dark";
+}
+
+export function normalizeThemeAutoMethod(value: unknown): string {
+  const method = String(value || "").trim().toLowerCase();
+  return method === "sun" || method === "sunrise / sunset" || method === "sunrise_sunset"
+    ? "Sunrise / Sunset" : "Time";
+}
+
+export function parseThemeSunOffset(value: unknown): number | null {
+  const text = String(value == null ? "" : value).trim();
+  if (!/^[+-]?\d+$/.test(text)) return null;
+  const offset = Number(text);
+  return Number.isSafeInteger(offset) && offset >= -180 && offset <= 180 ? offset : null;
+}
+
 export function normalizeBrightnessMode(value: unknown): string {
   const mode = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (mode === "manual") return "manual";
@@ -203,6 +223,10 @@ export function normalizeHomeAssistantArtworkProtocol(value: unknown): string {
   return String(value || "").trim().toLowerCase() === "https" ? "https" : "http";
 }
 
+export function normalizeHomeAssistantArtworkHost(value: unknown): string {
+  return String(value == null ? "" : value).trim().slice(0, 253);
+}
+
 export function normalizeHomeAssistantArtworkEndpointMode(
   value: unknown,
   protocol: unknown = "http",
@@ -321,6 +345,7 @@ export interface BackupPanelSettingsCurrent {
   ntpServer1: string;
   ntpServer2: string;
   ntpServer3: string;
+  coverArtHomeAssistantHost: string;
   coverArtHomeAssistantProtocol: string;
   coverArtHomeAssistantPort: number;
   coverArtHomeAssistantEndpointMode: string;
@@ -368,6 +393,7 @@ export interface BackupPanelSettingsState {
   mediaPlayerSleepPrevention: boolean;
   mediaPlayerSleepPreventionEntity: string;
   coverArtScreensaver: boolean;
+  clockDate: boolean;
   clockOverlay: boolean;
   coverArtMediaPlayerEntity: string;
   coverArtSecondaryMediaPlayerEntity: string;
@@ -376,6 +402,7 @@ export interface BackupPanelSettingsState {
   coverArtPlaybackControl: boolean;
   coverArtTrackOverlayDuration: unknown;
   coverArtHideExternalInput: boolean;
+  coverArtHomeAssistantHost: string;
   coverArtHomeAssistantProtocol: string;
   coverArtHomeAssistantPort: number;
   coverArtHomeAssistantEndpointMode: string;
@@ -460,6 +487,9 @@ export function normalizeBackupPanelSettings(
   const coverArtHomeAssistantProtocol = objectValue(settings, "home_assistant_artwork_protocol") != null
     ? normalizeHomeAssistantArtworkProtocol(settings.home_assistant_artwork_protocol)
     : normalizeHomeAssistantArtworkProtocol(current.coverArtHomeAssistantProtocol);
+  const coverArtHomeAssistantHost = objectValue(settings, "home_assistant_artwork_host") != null
+    ? normalizeHomeAssistantArtworkHost(settings.home_assistant_artwork_host)
+    : normalizeHomeAssistantArtworkHost(current.coverArtHomeAssistantHost);
   const coverArtHomeAssistantPort = objectValue(settings, "home_assistant_artwork_port") != null
     ? normalizeHomeAssistantArtworkPort(settings.home_assistant_artwork_port)
     : normalizeHomeAssistantArtworkPort(current.coverArtHomeAssistantPort);
@@ -523,6 +553,7 @@ export function normalizeBackupPanelSettings(
       : true,
     mediaPlayerSleepPreventionEntity: String(settings.media_player_sleep_prevention_entity || settings.cover_art_media_player_entity || ""),
     coverArtScreensaver: !!settings.cover_art_screensaver,
+    clockDate: !!settings.clock_date,
     clockOverlay: objectValue(settings, "clock_overlay") != null
       ? !!settings.clock_overlay
       : false,
@@ -537,6 +568,7 @@ export function normalizeBackupPanelSettings(
     coverArtHideExternalInput: objectValue(settings, "cover_art_hide_external_input") != null
       ? !!settings.cover_art_hide_external_input
       : true,
+    coverArtHomeAssistantHost,
     coverArtHomeAssistantProtocol,
     coverArtHomeAssistantPort,
     coverArtHomeAssistantEndpointMode: normalizeHomeAssistantArtworkEndpointMode(

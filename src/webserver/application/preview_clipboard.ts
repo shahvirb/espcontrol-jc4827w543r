@@ -209,7 +209,7 @@ export function createPreviewClipboardFeature(
             layoutSlots.unshift(-2);
             requestedSizes[-2] = 1;
         }
-        if (orderedSlots.length > dependencies.layout.numSlots) {
+        if (orderedSlots.length > dependencies.layout.previewSlots) {
             throw cardTransferError("A copied subpage has more cards than this controller can display.");
         }
         var targetSizes: any = {};
@@ -220,8 +220,8 @@ export function createPreviewClipboardFeature(
                 : {};
             targetSizes[requestedSlot] = normalizeCardSizeForConfig(requestedButton, requestedSizes[requestedSlot]);
         }
-        var placementOrder: any = layoutSlots.length <= dependencies.layout.numSlots ? layoutSlots : orderedSlots;
-        var targetGrid: any = placeOrderedGridEntries(placementOrder, targetSizes, dependencies.layout.numSlots);
+        var placementOrder: any = layoutSlots.length <= dependencies.layout.previewSlots ? layoutSlots : orderedSlots;
+        var targetGrid: any = placeOrderedGridEntries(placementOrder, targetSizes, dependencies.layout.previewSlots);
         var placed: any = {};
         targetGrid.forEach(function (slot: any) {
             if (slot > 0 || slot === -2)
@@ -262,6 +262,7 @@ export function createPreviewClipboardFeature(
             grid: grid,
             sizes: sizes,
             backLabel: parsed.backLabel || "Back",
+            backColor: parsed.backColor || "",
         };
         subpage.order = serializeSubpageGrid(subpage);
         return { subpage: subpage, resized: resized };
@@ -359,12 +360,12 @@ export function createPreviewClipboardFeature(
         var slots: any = [];
         var resized: any = 0;
         for (var i: any = 0; i < entries.length; i++) {
-            var newSlot: any = firstUnusedClipboardSlot(nextGrid, dependencies.layout.numSlots);
+            var newSlot: any = firstUnusedClipboardSlot(nextGrid, dependencies.layout.previewSlots);
             if (newSlot < 0)
                 return { error: "There is not enough room to paste every card." };
             var entry: any = entries[i];
             var requestedSize: any = entry.size || 1;
-            var placement: any = findDuplicatePlacement(nextGrid, pos, requestedSize, dependencies.layout.numSlots);
+            var placement: any = findDuplicatePlacement(nextGrid, pos, requestedSize, dependencies.layout.previewSlots);
             if (placement.pos < 0)
                 return { error: "There is not enough room to paste every card." };
             if (placement.size !== requestedSize)
@@ -411,6 +412,7 @@ export function createPreviewClipboardFeature(
             grid: (sp.grid || []).slice(),
             sizes: cloneSizeMap(sp.sizes),
             backLabel: sp.backLabel || "Back",
+            backColor: sp.backColor || "",
         };
     }
     function planSubpageClipboardPaste(entries: any, pos: any) {
@@ -428,11 +430,11 @@ export function createPreviewClipboardFeature(
                 return { error: "The " + cardTransferTypeLabel(entry.type || "") +
                         " card type cannot be placed inside a subpage." };
             }
-            var newSlot: any = firstUnusedClipboardSlot(subpage.grid, dependencies.layout.numSlots);
+            var newSlot: any = firstUnusedClipboardSlot(subpage.grid, dependencies.layout.previewSlots);
             if (newSlot < 0)
                 return { error: "There is not enough room to paste every card." };
             var requestedSize: any = entry.size || 1;
-            var placement: any = findDuplicatePlacement(subpage.grid, pos, requestedSize, dependencies.layout.numSlots);
+            var placement: any = findDuplicatePlacement(subpage.grid, pos, requestedSize, dependencies.layout.previewSlots);
             if (placement.pos < 0)
                 return { error: "There is not enough room to paste every card." };
             if (placement.size !== requestedSize)

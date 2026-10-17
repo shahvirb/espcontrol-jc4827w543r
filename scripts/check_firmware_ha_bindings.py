@@ -107,21 +107,21 @@ def package_api_navigate_enabled(package_path: Path, root: Path) -> bool:
     return bool(package.get("apiNavigateAction", True))
 
 
-def package_local_voice_services_enabled(package_path: Path, root: Path) -> bool:
+def package_api_open_modal_enabled(package_path: Path, root: Path) -> bool:
     manifest_path = root / "devices" / "manifest.json"
     if not manifest_path.exists():
-        return False
+        return True
     try:
         slug = package_path.relative_to(root / "devices").parts[0]
     except (ValueError, IndexError):
-        return False
+        return True
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return False
+        return True
     device = manifest.get("devices", {}).get(slug, {})
     package = device.get("firmware", {}).get("package", {})
-    return bool(package.get("localVoiceServices"))
+    return bool(package.get("apiOpenModalAction", True))
 
 
 HA_BOUNDARY_ALLOWLIST = {
@@ -1037,9 +1037,19 @@ def firmware_cover_art_refresh_errors(path: Path, root: Path) -> list[str]:
         r"normalize_display_text\(\s*decode_html_entities\(id\(cover_art_media_source\)\)\)",
         sync_text_body,
     )
+    title_display_normalized = sync_text_body is not None and re.search(
+        r"const std::string title\s*=\s*espcontrol::media::normalize_media_display_text\(\s*"
+        r"id\(cover_art_title\)\);",
+        sync_text_body,
+    ) and "normalize_display_text(title)" in sync_text_body
+    artist_display_normalized = sync_text_body is not None and re.search(
+        r"normalize_display_text\(\s*espcontrol::media::normalize_media_display_text\(\s*"
+        r"id\(cover_art_artist\)\)\)",
+        sync_text_body,
+    )
     if sync_text_body is not None and (
-        "normalize_display_text(id(cover_art_title))" not in sync_text_body
-        or "normalize_display_text(id(cover_art_artist))" not in sync_text_body
+        not title_display_normalized
+        or not artist_display_normalized
         or source_display_normalized is None
     ):
         errors.append(f"{rel}: normalize decoded cover art metadata only at the label boundary")
@@ -1604,8 +1614,9 @@ def firmware_media_power_binding_errors(firmware_dir: Path, root: Path) -> list[
         'std::string("supported_features")',
         "media_playback_subscribe_volume(state)",
         "media_control_send_power_action",
-        'send_media_player_action(ctx->entity_id, "media_player.turn_on")',
-        'send_media_player_action(ctx->entity_id, "media_player.turn_off")',
+        "ctx && !ctx->power_entity.empty()",
+        'send_media_player_action(ctx->power_entity, "homeassistant.turn_on")',
+        'send_media_player_action(ctx->power_entity, "homeassistant.turn_off")',
     )
     capability_required = (
         "SUPPORT_TURN_ON = 128",
@@ -1618,7 +1629,7 @@ def firmware_media_power_binding_errors(firmware_dir: Path, root: Path) -> list[
         needle not in capability_text for needle in capability_required
     ):
         errors.append(
-            "components/espcontrol: keep media Power gated by supported_features and dispatch explicit turn_on/turn_off actions"
+            "components/espcontrol: keep media Power gated by its optional entity and dispatch explicit turn_on/turn_off actions"
         )
 
     match = MEDIA_CONTROL_STATE_PATTERN.search(media_text)
@@ -2365,7 +2376,7 @@ def firmware_image_card_startup_errors(
         or "ctx->media_artwork_retry_mask = 0;" not in text
         or "ctx->pending_fallback_picture.clear();" not in text
         or "artwork_picture_response_clears_retry" not in text
-        or "inline void image_card_refresh_due()" not in text
+        or "inline void image_card_refresh_due(" not in text
         or text.count("image_card_request_current_picture(ctx);") < 2
         or "media_artwork_retry_mask" not in text
         or "artwork_source_request_mask" not in text
@@ -2866,6 +2877,83 @@ def firmware_clock_bar_navigation_errors(
             errors.append(
                 f"{rel}: guard late home-page navigation behind the active display mode"
             )
+    return errors
+
+
+def firmware_display_active_finalization_errors(
+    backlight_path: Path,
+    schedule_path: Path,
+    connectivity_paths: tuple[Path, ...],
+    root: Path,
+) -> list[str]:
+    errors: list[str] = []
+
+    backlight_rel = backlight_path.relative_to(root)
+    backlight_text = backlight_path.read_text(encoding="utf-8")
+    finalize_body = yaml_script_body(backlight_text, "display_active_finalize")
+    if finalize_body is None:
+        errors.append(f"{backlight_rel}: missing shared active-display finalizer")
+    else:
+        ordered_tokens = (
+            "delay: 50ms",
+            "espcontrol::DisplayMode::ACTIVE",
+            "lv_scr_act() == id(main_page)->obj",
+            "script.execute: clock_bar_apply",
+            "script.wait: clock_bar_apply",
+            "script.execute: backlight_apply_brightness",
+            "script.wait: backlight_apply_brightness",
+            "script.execute: screensaver_idle_check",
+            "script.execute: home_screen_idle_check",
+        )
+        indexes = [finalize_body.find(token) for token in ordered_tokens]
+        if any(index == -1 for index in indexes) or indexes != sorted(indexes):
+            errors.append(
+                f"{backlight_rel}: finalize active display after page settle with clock bar, "
+                "configured brightness, and idle timers"
+            )
+
+    schedule_rel = schedule_path.relative_to(root)
+    schedule_text = schedule_path.read_text(encoding="utf-8")
+    wake_body = yaml_script_body(schedule_text, "screen_schedule_wake")
+    if wake_body is None:
+        errors.append(f"{schedule_rel}: missing screen_schedule_wake script")
+    else:
+        reconcile_index = wake_body.find("script.execute: display_mode_reconcile")
+        transition_index = wake_body.find("script.wait: display_mode_apply_transition")
+        finalize_index = wake_body.find("script.execute: display_active_finalize")
+        if not (0 <= reconcile_index < transition_index < finalize_index):
+            errors.append(
+                f"{schedule_rel}: wait for scheduled wake transition before finalizing the active display"
+            )
+        if "espcontrol::DisplayRequestSource::MANUAL_SLEEP" in wake_body:
+            errors.append(
+                f"{schedule_rel}: preserve manual sleep across automatic scheduled wake"
+            )
+
+    transition_body = yaml_script_body(backlight_text, "display_mode_apply_transition") or ""
+    completion_index = transition_body.find("complete_transition(")
+    finalize_index = transition_body.find("script.execute: display_active_finalize")
+    if not (0 <= completion_index < finalize_index):
+        errors.append(
+            f"{backlight_rel}: finalize every completed active transition in the shared adapter"
+        )
+
+    for connectivity_path in connectivity_paths:
+        if not connectivity_path.exists():
+            continue
+        connectivity_rel = connectivity_path.relative_to(root)
+        navigation_body = yaml_script_body(
+            connectivity_path.read_text(encoding="utf-8"), "navigate_after_api"
+        )
+        if navigation_body is None:
+            continue
+        page_index = navigation_body.find("lvgl.page.show: main_page")
+        finalize_index = navigation_body.find("script.execute: display_active_finalize")
+        if not (0 <= page_index < finalize_index):
+            errors.append(
+                f"{connectivity_rel}: finalize brightness, clock bar, and idle timers after main-page navigation"
+            )
+
     return errors
 
 
@@ -3471,8 +3559,11 @@ def firmware_s3_api_errors(
     if s3_packages_path.exists():
         s3_rel = s3_packages_path.relative_to(root)
         s3_packages = s3_packages_path.read_text(encoding="utf-8")
-        if "api_navigate" in s3_packages or "api_navigate.yaml" in s3_packages:
-            errors.append(f"{s3_rel}: omit the Home Assistant navigate API action on S3")
+        has_navigate_package = "api_navigate" in s3_packages or "api_navigate.yaml" in s3_packages
+        if package_api_navigate_enabled(s3_packages_path, root) and not has_navigate_package:
+            errors.append(f"{s3_rel}: include the Home Assistant navigate API action on S3")
+        elif not package_api_navigate_enabled(s3_packages_path, root) and has_navigate_package:
+            errors.append(f"{s3_rel}: omit the Home Assistant navigate API action when disabled")
 
     for package_path in package_paths:
         if package_path == s3_packages_path or not package_path.exists():
@@ -3483,6 +3574,50 @@ def firmware_s3_api_errors(
         package_text = package_path.read_text(encoding="utf-8")
         if "api_navigate" not in package_text or "api_navigate.yaml" not in package_text:
             errors.append(f"{package_rel}: include the dedicated Home Assistant navigate API package")
+    return errors
+
+
+def firmware_open_modal_api_errors(root: Path, package_paths: tuple[Path, ...]) -> list[str]:
+    errors: list[str] = []
+    api_path = root / "common/device/api_open_modal.yaml"
+    scripts_path = root / "common/device/api_remote_actions.yaml"
+    if not api_path.exists():
+        return ["common/device/api_open_modal.yaml: missing entity modal API action"]
+    if not scripts_path.exists():
+        return ["common/device/api_remote_actions.yaml: missing shared remote action scripts"]
+    api_text = api_path.read_text(encoding="utf-8")
+    scripts_text = scripts_path.read_text(encoding="utf-8")
+    modal_script_start = scripts_text.find("  - id: open_entity_modal")
+    modal_script_end = scripts_text.find("  - id: open_remote_subpage", modal_script_start)
+    modal_script = scripts_text[modal_script_start:modal_script_end if modal_script_end >= 0 else None]
+    api_required = ("action: open_modal", "entity_id: string", "id: open_entity_modal")
+    script_required = ("mode: restart", "espcontrol_can_open_modal(entity_id,",
+                      "script.execute: screensaver_wake", "script.wait: screensaver_wake",
+                      "espcontrol_open_modal(entity_id,", "script.execute: screensaver_idle_check",
+                      "script.execute: home_screen_idle_check")
+    api_positions = [api_text.find(value) for value in api_required]
+    script_positions = [modal_script.find(value) for value in script_required]
+    if (modal_script_start < 0 or -1 in api_positions or api_positions != sorted(api_positions)
+            or -1 in script_positions or script_positions != sorted(script_positions)
+            or modal_script.count("grid_phase2_complete()") < 2):
+        errors.append("common/device/api_open_modal.yaml: validate, wake, revalidate, open, then reset idle timers")
+    for path in package_paths:
+        has_modal = package_api_open_modal_enabled(path, root)
+        has_navigate = package_api_navigate_enabled(path, root)
+        package_text = path.read_text(encoding="utf-8") if path.exists() else ""
+        if not has_modal and "api_open_modal.yaml" in package_text:
+            errors.append(f"{path.relative_to(root)}: omit the entity modal action when disabled")
+        if not has_navigate and "api_navigate.yaml" in package_text:
+            errors.append(f"{path.relative_to(root)}: omit the navigate action when disabled")
+        has_remote_scripts = "api_remote_actions.yaml" in package_text
+        if (has_modal or has_navigate) and not has_remote_scripts:
+            errors.append(f"{path.relative_to(root)}: include shared remote scripts when either API action is enabled")
+        if not (has_modal or has_navigate) and has_remote_scripts:
+            errors.append(f"{path.relative_to(root)}: omit shared remote scripts when both API actions are disabled")
+        if not has_modal:
+            continue
+        if "api_open_modal.yaml" not in package_text:
+            errors.append(f"{path.relative_to(root)}: include the entity modal action on P4 and S3")
     return errors
 
 
@@ -3506,16 +3641,12 @@ def firmware_navigation_target_errors(
         errors.append(f"{navigation_rel}: register general home-screen navigation targets")
     if "navigation_find_label_target" not in navigation_text or "navigation_home_targets()" not in navigation_text:
         errors.append(f"{navigation_rel}: resolve navigate labels against home-screen cards")
-    if "navigation_has_home_label_target" not in navigation_text:
-        errors.append(f"{navigation_rel}: let configured card labels take priority over voice aliases")
     if "entry.display_order < best->display_order" not in navigation_text:
         errors.append(f"{navigation_rel}: choose the first displayed card when labels are duplicated")
     if "navigation_find_slot_target" not in navigation_text or "entry.slot == slot" not in navigation_text:
         errors.append(f"{navigation_rel}: resolve slot:n against home-screen card slots")
     if "navigation_return_home(main_page_obj)" not in navigation_text or "handle_button_click(target->config, target->slot, target->button)" not in navigation_text:
         errors.append(f"{navigation_rel}: activate navigated home-screen cards through the normal tap handler")
-    if "navigation_is_voice_target" not in navigation_text or '"device_volume"' not in navigation_text:
-        errors.append(f"{navigation_rel}: reserve voice volume navigation aliases")
     if "normalized == \"home\" || normalized == \"main\"" not in navigation_text:
         errors.append(f"{navigation_rel}: preserve home/main navigation targets")
 
@@ -3542,35 +3673,15 @@ def firmware_navigation_target_errors(
             errors.append(f"{navigation_driver_rel}: preserve subpage navigation registration")
 
     if not api_navigate_path.exists():
-        errors.append("common/device/api_navigate.yaml: route voice aliases through the navigate action")
+        errors.append("common/device/api_navigate.yaml: route navigation targets through the navigate action")
     else:
         api_rel = api_navigate_path.relative_to(root)
         api_text = api_navigate_path.read_text(encoding="utf-8")
-        if "navigation_is_voice_target(target)" not in api_text or "${navigate_voice_target_code}" not in api_text:
-            errors.append(f"{api_rel}: route reserved voice targets through the device-specific voice hook")
-        if "!navigation_has_home_label_target(target)" not in api_text:
-            errors.append(f"{api_rel}: resolve configured card labels before reserved voice aliases")
+        shared_actions_path = root / "common/device/api_remote_actions.yaml"
+        if shared_actions_path.exists():
+            api_text += "\n" + shared_actions_path.read_text(encoding="utf-8")
         if "espcontrol_navigate(target, id(main_page)->obj);" not in api_text:
-            errors.append(f"{api_rel}: keep normal navigate targets routed through espcontrol_navigate")
-
-    voice_package_found = False
-    for package_path in package_paths:
-        if not package_path.exists():
-            continue
-        package_rel = package_path.relative_to(root)
-        package_text = package_path.read_text(encoding="utf-8")
-        if "navigate_voice_target_code" not in package_text:
-            errors.append(f"{package_rel}: define a voice-target navigate hook")
-        if package_local_voice_services_enabled(package_path, root):
-            voice_package_found = True
-            if "id(open_device_volume_control).execute();" not in package_text:
-                errors.append(f"{package_rel}: open the local voice volume modal for voice navigation aliases")
-            if "id(voice_services_enabled).state" not in package_text:
-                errors.append(f"{package_rel}: only open the voice volume modal when Voice Services are enabled")
-        elif "open_device_volume_control" in package_text:
-            errors.append(f"{package_rel}: keep the voice volume modal hook limited to local voice service packages")
-    if not voice_package_found:
-        errors.append("devices/manifest.json: define a voice volume navigate hook for a local voice service package")
+            errors.append(f"{api_rel}: route navigation targets through espcontrol_navigate")
     return errors
 
 
@@ -3960,6 +4071,11 @@ def run_scan() -> int:
     )
     errors.extend(firmware_clock_bar_pending_wake_errors(DISPLAY_CONFIG_PATH, ROOT))
     errors.extend(firmware_clock_bar_navigation_errors(CONNECTIVITY_PATHS, ROOT))
+    errors.extend(
+        firmware_display_active_finalization_errors(
+            BACKLIGHT_PATH, BACKLIGHT_SCHEDULE_PATH, CONNECTIVITY_PATHS, ROOT
+        )
+    )
     errors.extend(firmware_clock_screensaver_overlay_errors(BACKLIGHT_PATH, ROOT))
     errors.extend(firmware_screen_schedule_screensaver_overlay_errors(COVER_ART_PATH, ROOT))
     errors.extend(firmware_screen_schedule_screensaver_override_errors(BACKLIGHT_PATH, ROOT))
@@ -3984,6 +4100,7 @@ def run_scan() -> int:
             ROOT,
         )
     )
+    errors.extend(firmware_open_modal_api_errors(ROOT, DEVICE_PACKAGE_PATHS))
     errors.extend(firmware_navigation_target_errors(FIRMWARE_DIR, API_NAVIGATE_PATH, DEVICE_PACKAGE_PATHS, ROOT))
     errors.extend(firmware_connectivity_api_errors(CONNECTIVITY_PATHS, ROOT))
     errors.extend(
@@ -4428,9 +4545,10 @@ def valid_media_power_binding_text() -> tuple[str, str]:
         "#endif\n"
         "}\n\n"
         "inline bool media_seek_pending_active() { return false; }\n"
+        "inline bool media_control_power_supported() { return ctx && !ctx->power_entity.empty(); }\n"
         "inline void media_control_send_power_action(MediaControlCtx *ctx) {\n"
-        "  send_media_player_action(ctx->entity_id, \"media_player.turn_on\");\n"
-        "  send_media_player_action(ctx->entity_id, \"media_player.turn_off\");\n"
+        "  send_media_player_action(ctx->power_entity, \"homeassistant.turn_on\");\n"
+        "  send_media_player_action(ctx->power_entity, \"homeassistant.turn_off\");\n"
         "}\n"
     )
     capability_text = (
@@ -4729,6 +4847,32 @@ def expect_clock_bar_navigation_errors(
             assert not errors, f"{name}: expected no errors, got {errors!r}"
 
 
+def expect_display_active_finalization_errors(
+    name: str,
+    backlight_text: str,
+    schedule_text: str,
+    connectivity_text: str,
+    expected: tuple[str, ...],
+) -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        addon_dir = root / "common" / "addon"
+        addon_dir.mkdir(parents=True)
+        backlight_path = addon_dir / "backlight.yaml"
+        schedule_path = addon_dir / "backlight_schedule.yaml"
+        connectivity_path = addon_dir / "connectivity.yaml"
+        backlight_path.write_text(backlight_text, encoding="utf-8")
+        schedule_path.write_text(schedule_text, encoding="utf-8")
+        connectivity_path.write_text(connectivity_text, encoding="utf-8")
+        errors = firmware_display_active_finalization_errors(
+            backlight_path, schedule_path, (connectivity_path,), root
+        )
+        for item in expected:
+            assert any(item in error for error in errors), f"{name}: missing {item!r} in {errors!r}"
+        if not expected:
+            assert not errors, f"{name}: expected no errors, got {errors!r}"
+
+
 def expect_clock_screensaver_overlay_errors(name: str, text: str, expected: tuple[str, ...]) -> None:
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -4917,6 +5061,7 @@ def expect_wifi_setup_display_text_errors(
         errors = firmware_wifi_setup_display_text_errors(
             loading_path, wifi_setup_path, connectivity_path, root
         )
+        errors = [error.replace("\\", "/") for error in errors]
         for item in expected:
             assert any(item in error for error in errors), f"{name}: missing {item!r} in {errors!r}"
         if not expected:
@@ -6212,6 +6357,17 @@ def run_self_test() -> int:
         ("normalize decoded cover art metadata only at the label boundary",),
     )
     expect_cover_art_refresh_errors(
+        "cover art metadata bypasses media unicode cleanup",
+        "script:\n"
+        "  - id: cover_art_sync_track_text\n"
+        "    then:\n"
+        "      - lambda: |-\n"
+        "          return normalize_display_text(id(cover_art_title));\n"
+        "          return normalize_display_text(id(cover_art_artist));\n"
+        "          return normalize_display_text(decode_html_entities(id(cover_art_media_source)));\n",
+        ("normalize decoded cover art metadata only at the label boundary",),
+    )
+    expect_cover_art_refresh_errors(
         "stale cover refresh guard present",
         "globals:\n"
         "  - id: cover_art_runtime\n"
@@ -6223,8 +6379,9 @@ def run_self_test() -> int:
         "  - id: cover_art_sync_track_text\n"
         "    then:\n"
         "      - lambda: |-\n"
-        "          return normalize_display_text(id(cover_art_title));\n"
-        "          return normalize_display_text(id(cover_art_artist));\n"
+        "          const std::string title = espcontrol::media::normalize_media_display_text(id(cover_art_title));\n"
+        "          return normalize_display_text(title);\n"
+        "          return normalize_display_text(espcontrol::media::normalize_media_display_text(id(cover_art_artist)));\n"
         "          return normalize_display_text(\n"
         "            decode_html_entities(id(cover_art_media_source)));\n"
         "  - id: cover_art_resolve_home_assistant_base_url\n"
@@ -7625,6 +7782,111 @@ def run_self_test() -> int:
         "",
         ("clear the shared wake guard after a stuck touch timeout",),
     )
+    valid_active_finalizer = (
+        "script:\n"
+        "  - id: display_mode_apply_transition\n"
+        "    then:\n"
+        "      - lambda: 'controller.complete_transition();'\n"
+        "      - script.execute: display_active_finalize\n"
+        "  - id: display_active_finalize\n"
+        "    then:\n"
+        "      - delay: 50ms\n"
+        "      - if:\n"
+        "          condition:\n"
+        "            lambda: 'return id(espcontrol_app).display().target_mode_is(espcontrol::DisplayMode::ACTIVE);'\n"
+        "          then:\n"
+        "            - if:\n"
+        "                condition:\n"
+        "                  lambda: 'return lv_scr_act() == id(main_page)->obj;'\n"
+        "                then:\n"
+        "                  - script.execute: clock_bar_apply\n"
+        "                  - script.wait: clock_bar_apply\n"
+        "                  - script.execute: backlight_apply_brightness\n"
+        "                  - script.wait: backlight_apply_brightness\n"
+        "            - script.execute: screensaver_idle_check\n"
+        "            - script.execute: home_screen_idle_check\n"
+    )
+    valid_schedule_wake = (
+        "script:\n"
+        "  - id: screen_schedule_wake\n"
+        "    then:\n"
+        "      - script.execute: display_mode_reconcile\n"
+        "      - script.wait: display_mode_apply_transition\n"
+        "      - script.execute: display_active_finalize\n"
+    )
+    valid_active_navigation = (
+        "script:\n"
+        "  - id: navigate_after_api\n"
+        "    then:\n"
+        "      - lvgl.page.show: main_page\n"
+        "      - script.execute: display_active_finalize\n"
+    )
+    expect_display_active_finalization_errors(
+        "active display finalization remains complete",
+        valid_active_finalizer,
+        valid_schedule_wake,
+        valid_active_navigation,
+        (),
+    )
+    expect_display_active_finalization_errors(
+        "active-state check precedes the page-specific guard",
+        valid_active_finalizer.replace(
+            "return id(espcontrol_app).display().target_mode_is(espcontrol::DisplayMode::ACTIVE);",
+            "return lv_scr_act() == id(main_page)->obj && "
+            "id(espcontrol_app).display().target_mode_is(espcontrol::DisplayMode::ACTIVE);",
+        ),
+        valid_schedule_wake,
+        valid_active_navigation,
+        ("finalize active display",),
+    )
+    expect_display_active_finalization_errors(
+        "scheduled wake waits for its display transition",
+        valid_active_finalizer,
+        valid_schedule_wake.replace(
+            "      - script.wait: display_mode_apply_transition\n", "", 1
+        ),
+        valid_active_navigation,
+        ("wait for scheduled wake transition",),
+    )
+    expect_display_active_finalization_errors(
+        "automatic scheduled wake preserves manual sleep",
+        valid_active_finalizer,
+        valid_schedule_wake.replace(
+            "    then:\n",
+            "    then:\n"
+            "      - lambda: 'id(espcontrol_app).display().clear(espcontrol::DisplayRequestSource::MANUAL_SLEEP);'\n",
+            1,
+        ),
+        valid_active_navigation,
+        ("preserve manual sleep",),
+    )
+    expect_display_active_finalization_errors(
+        "completed active transitions restart idle handling",
+        valid_active_finalizer.replace(
+            "      - script.execute: display_active_finalize\n", "", 1
+        ),
+        valid_schedule_wake,
+        valid_active_navigation,
+        ("finalize every completed active transition",),
+    )
+    expect_display_active_finalization_errors(
+        "active finalizer restores configured brightness",
+        valid_active_finalizer.replace(
+            "            - script.execute: backlight_apply_brightness\n", "", 1
+        ),
+        valid_schedule_wake,
+        valid_active_navigation,
+        ("configured brightness",),
+    )
+    expect_display_active_finalization_errors(
+        "main-page navigation uses the active finalizer",
+        valid_active_finalizer,
+        valid_schedule_wake,
+        valid_active_navigation.replace(
+            "      - script.execute: display_active_finalize\n", "", 1
+        ),
+        ("after main-page navigation",),
+    )
     expect_clock_bar_navigation_errors(
         "late navigation requires active display mode",
         "script:\n"
@@ -8044,8 +8306,13 @@ def run_self_test() -> int:
     expect_s3_api_errors(
         "S3 includes navigate API package",
         "api:\n  max_connections: 3\n  max_send_queue: 12\n",
-        ("omit the Home Assistant navigate API action on S3",),
+        (),
         s3_packages_text="packages:\n  api_navigate: !include ../../common/device/api_navigate.yaml\n",
+    )
+    expect_s3_api_errors(
+        "S3 missing navigate API package",
+        "api:\n  max_connections: 3\n  max_send_queue: 12\n",
+        ("include the Home Assistant navigate API action on S3",),
     )
     expect_s3_api_errors(
         "navigate action left in shared core",
@@ -8065,8 +8332,6 @@ def run_self_test() -> int:
         "inline auto navigation_home_targets() {}\n"
         "inline void navigation_find_label_target() { navigation_home_targets(); entry.display_order < best->display_order; }\n"
         "inline void navigation_find_slot_target() { entry.slot == slot; }\n"
-        "inline bool navigation_is_voice_target() { return normalized == \"device_volume\"; }\n"
-        "inline bool navigation_has_home_label_target() {}\n"
         "inline void navigation_activate_home_target() { navigation_return_home(main_page_obj); handle_button_click(target->config, target->slot, target->button); }\n"
         "inline void espcontrol_navigate() { normalized == \"home\" || normalized == \"main\"; }\n",
         "navigation_clear_home_targets();\n"
@@ -8074,13 +8339,9 @@ def run_self_test() -> int:
         "navigation_clear_home_targets();\n"
         "navigation_register_home_target(idx, pos, p.label, s.config->state, s.btn);\n",
         "inline bool navigation_driver_own_subpage() { navigation_register_subpage( }\n",
-        "if (navigation_is_voice_target(target) && !navigation_has_home_label_target(target)) { ${navigate_voice_target_code} } else { espcontrol_navigate(target, id(main_page)->obj); }\n",
-        {
-            "esp32-p4-86": "navigate_voice_target_code: |-\n  if (id(voice_services_enabled).state) { id(open_device_volume_control).execute(); }\n",
-            "future-voice-panel": "navigate_voice_target_code: |-\n  if (id(voice_services_enabled).state) { id(open_device_volume_control).execute(); }\n",
-            "other-p4": "navigate_voice_target_code: |-\n  ESP_LOGW(\"navigation\", \"Voice volume target is not available on this device\");\n",
-        },
-        ("esp32-p4-86", "future-voice-panel"),
+        "espcontrol_navigate(target, id(main_page)->obj);\n",
+        {},
+        (),
         (),
     )
     expect_connectivity_api_errors(
@@ -8164,6 +8425,71 @@ def run_self_test() -> int:
         "      - lvgl.page.show: ha_setup_page\n",
         ("keep the current display visible",),
     )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        api = root / "common/device/api_open_modal.yaml"
+        api.parent.mkdir(parents=True)
+        original = (ROOT / "common/device/api_open_modal.yaml").read_text()
+        scripts = root / "common/device/api_remote_actions.yaml"
+        scripts.write_text((ROOT / "common/device/api_remote_actions.yaml").read_text())
+        package = root / "packages.yaml"
+        package.write_text(
+            "packages:\n"
+            "  api_remote_actions: !include common/device/api_remote_actions.yaml\n"
+            "  api_open_modal: !include common/device/api_open_modal.yaml\n"
+        )
+        api.write_text(original)
+        assert not firmware_open_modal_api_errors(root, (package,))
+        for token in ("mode: restart", "espcontrol_can_open_modal", "script.wait: screensaver_wake",
+                      "espcontrol_open_modal", "script.execute: home_screen_idle_check"):
+            source_path = api if token in original else scripts
+            source_text = original if source_path == api else scripts.read_text(encoding="utf-8")
+            source_path.write_text(source_text.replace(token, "removed"))
+            assert firmware_open_modal_api_errors(root, (package,)), token
+            source_path.write_text(source_text)
+        manifest = root / "devices/manifest.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(
+            json.dumps({"devices": {"constrained": {"firmware": {"package": {"apiOpenModalAction": False}}}}}),
+            encoding="utf-8",
+        )
+        disabled_package = root / "devices/constrained/packages.yaml"
+        disabled_package.parent.mkdir(parents=True)
+        disabled_package.write_text("packages: {}\n", encoding="utf-8")
+        # Navigation remains independently enabled, so its package includes the
+        # shared scripts while omitting the modal API package.
+        manifest.write_text(
+            json.dumps({"devices": {"constrained": {"firmware": {"package": {
+                "apiOpenModalAction": False, "apiNavigateAction": True
+            }}}}}),
+            encoding="utf-8",
+        )
+        disabled_package.write_text(
+            "packages:\n"
+            "  api_remote_actions: !include common/device/api_remote_actions.yaml\n"
+            "  api_navigate: !include common/device/api_navigate.yaml\n",
+            encoding="utf-8",
+        )
+        assert not firmware_open_modal_api_errors(root, (disabled_package,))
+        # The inverse selection keeps the modal actions and shared scripts but
+        # omits navigation.
+        manifest.write_text(
+            json.dumps({"devices": {"constrained": {"firmware": {"package": {
+                "apiOpenModalAction": True, "apiNavigateAction": False
+            }}}}}),
+            encoding="utf-8",
+        )
+        disabled_package.write_text(
+            "packages:\n"
+            "  api_remote_actions: !include common/device/api_remote_actions.yaml\n"
+            "  api_open_modal: !include common/device/api_open_modal.yaml\n",
+            encoding="utf-8",
+        )
+        assert not firmware_open_modal_api_errors(root, (disabled_package,))
+        package.write_text("packages: {}\n")
+        assert firmware_open_modal_api_errors(root, (package,))
+        api.unlink()
+        assert firmware_open_modal_api_errors(root, (package,))
     print("Firmware Home Assistant binding self-tests passed.")
     return 0
 

@@ -110,7 +110,7 @@ function nativeConfigState(slug) {
   };
 }
 
-async function assertSubpageTitleTypography(page, label) {
+async function assertSubpageTitleTypography(page, label, nativeState) {
   await page.locator('.sp-main [data-slot="3"] .sp-subpage-badge').click();
   await page.waitForSelector(".sp-clockbar-subpage-title");
   const typography = await page.evaluate(() => {
@@ -138,6 +138,41 @@ async function assertSubpageTitleTypography(page, label) {
     typography.card,
     `${label}: subpage title uses the device card-label typography`,
   );
+  const initialColor = await page.locator(".sp-back-btn").evaluate(el => getComputedStyle(el).backgroundColor);
+  await page.locator(".sp-back-btn .sp-btn-label").click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Custom Colours", exact: true }).click();
+  await page.getByRole("button", { name: "Set colour to yellow", exact: true }).click();
+  await page.waitForFunction(() => {
+    const back = document.querySelector(".sp-back-btn");
+    return getComputedStyle(back).backgroundColor === "rgb(238, 209, 70)" &&
+      getComputedStyle(back.querySelector(".sp-btn-label")).color === "rgb(33, 33, 33)" &&
+      getComputedStyle(back.querySelector(".sp-btn-icon")).color === "rgb(33, 33, 33)";
+  });
+  await waitForNativeState(nativeState,
+    () => nativeState.document.subpages[3].includes("B=:EED146"), `${label}: save back colour`);
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".sp-back-btn .sp-back-hit").click();
+  await page.locator('.sp-main [data-slot="3"] .sp-subpage-badge').click();
+  assert.strictEqual(await page.locator(".sp-back-btn").evaluate(el => getComputedStyle(el).backgroundColor),
+    "rgb(238, 209, 70)", `${label}: reopening subpage preserves its back colour`);
+  await page.locator(".sp-back-btn .sp-btn-label").click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Custom Colours", exact: true }).click();
+  const custom = page.locator(".sp-settings-modal").getByLabel("Choose custom colour", { exact: true });
+  await custom.evaluate(input => {
+    input.value = "#123abc";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await waitForNativeState(nativeState,
+    () => nativeState.document.subpages[3].includes("B=:123ABC"), `${label}: save custom back colour`);
+  await page.waitForFunction(() => getComputedStyle(document.querySelector(".sp-back-btn")).backgroundColor === "rgb(18, 58, 188)");
+  await page.getByRole("button", { name: "Reset colours to defaults", exact: true }).click();
+  await waitForNativeState(nativeState,
+    () => !nativeState.document.subpages[3].includes("B=:"), `${label}: reset back colour`);
+  assert.strictEqual(await page.locator(".sp-back-btn").evaluate(el => getComputedStyle(el).backgroundColor),
+    initialColor, `${label}: reset restores the theme colour`);
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await page.locator(".sp-back-btn .sp-back-hit").click();
   await page.waitForSelector(".sp-clockbar-subpage-title", { state: "detached" });
 }
@@ -293,6 +328,26 @@ async function installRoutes(context, slug, options = {}) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(identity.info) });
       return;
     }
+    if (requestUrl.hostname === "espcontrol.test" && requestUrl.pathname === "/api/v1/screensaver-pin") {
+      const pin = options.screensaverPinState;
+      if (!pin) { await route.fulfill({ status: 404, body: "Not found" }); return; }
+      if (route.request().method() === "POST") {
+        if (options.resetState && route.request().headers()["x-espcontrol-epoch"] !== String(options.resetState.epoch)) {
+          await route.fulfill({ status: 428, contentType: "application/json", body: '{"error":"Reload the page before changing settings"}' });
+          return;
+        }
+        const settings = route.request().postDataJSON();
+        pin.posts.push(settings);
+        if (pin.failSave) { await route.fulfill({ status: 500, body: "Failed" }); return; }
+        pin.enabled = settings.enabled;
+        if (typeof settings.pin === "string") pin.pin = settings.pin;
+        if (typeof settings.randomize_keypad === "boolean") pin.randomize = settings.randomize_keypad;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ enabled: pin.enabled, has_pin: !!pin.pin, pin_length: pin.pin.length,
+          randomize_keypad: pin.randomize ?? true }) });
+      return;
+    }
     if (nativeState && requestUrl.pathname.startsWith("/api/v1/")) {
       const suppliedGeneration = route.request().headers()["if-match"];
       nativeState.requests.push(
@@ -312,6 +367,7 @@ async function installRoutes(context, slug, options = {}) {
           api: { version: 1 },
           reset: options.resetState ? { modes: ["customization", "factory"], status: "/api/v1/reset" } : undefined,
           identity: options.identityState ? { version: 1 } : undefined,
+          screensaver_pin: options.screensaverPinState ? { version: 1 } : undefined,
           configuration: { read: true, write: true, document_versions: [1] },
           web_assets: { versions: [1] },
         }),
@@ -330,6 +386,7 @@ async function installRoutes(context, slug, options = {}) {
           api: { version: 1 },
           reset: options.resetState ? { modes: ["customization", "factory"], status: "/api/v1/reset" } : undefined,
           identity: options.identityState ? { version: 1 } : undefined,
+          screensaver_pin: options.screensaverPinState ? { version: 1 } : undefined,
           configuration: { read: false, write: false, document_versions: [] },
         }),
       });
@@ -568,6 +625,7 @@ function seededEvents() {
       min: 1,
       max: 65535,
     },
+    { id: "text-home_assistant_artwork_host", state: "" },
     { id: "switch-firmware__auto_update", state: "ON", value: true },
     { id: "text_sensor-firmware__version", state: "v1.12.0" },
     {
@@ -1112,13 +1170,98 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
     true,
     `${label}: color controls should be visible`,
   );
+  if (options.exerciseInteractions) {
+    const picker = page.locator('#sp-set-on-color input[type="color"]');
+    const originalColour = await picker.inputValue();
+    const colourPosts = () => posts.filter(post => post.domain === "text" && post.name === "button_on_color");
+    const savesBefore = colourPosts().length;
+    await picker.evaluate(input => {
+      for (const hex of ["#112233", "#223344", "#123abc"]) {
+        input.value = hex;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(100);
+    assert.strictEqual(colourPosts().length, savesBefore,
+      `${label}: dragging the native picker must not save intermediate colours`);
+    const committed = page.waitForRequest(request => request.method() === "POST" &&
+      postRecord(request.url()).name === "button_on_color");
+    await picker.dispatchEvent("change");
+    await committed;
+    assert.strictEqual(colourPosts().length, savesBefore + 1,
+      `${label}: confirming the native picker saves exactly once`);
+    assert.strictEqual(colourPosts().at(-1).value, "123ABC",
+      `${label}: the committed colour is saved as uppercase hex`);
+    await picker.dispatchEvent("change");
+    await page.waitForTimeout(100);
+    assert.strictEqual(colourPosts().length, savesBefore + 1,
+      `${label}: repeated confirmation of the same colour does not save again`);
+    await picker.fill(originalColour);
+  }
+  const themeModes = page.locator("#sp-set-theme-mode");
+  assert.deepStrictEqual(await themeModes.locator("button").allTextContents(),
+    ["Dark", "Light", "Automatic"], `${label}: theme modes render`);
+  await themeModes.getByRole("button", { name: "Automatic" }).click();
+  assert(await page.locator("#sp-set-theme-auto-method").isVisible(),
+    `${label}: Auto exposes its method`);
+  assert(await page.locator("#sp-set-theme-light-start").isVisible(),
+    `${label}: Time exposes Light start`);
+  assert(await page.locator("#sp-set-theme-dark-start").isVisible(),
+    `${label}: Time exposes Dark start`);
+  await page.locator("#sp-set-theme-auto-method").getByRole("button", { name: "Automatic" }).click();
+  assert.strictEqual(await page.locator("#sp-set-theme-sunrise-offset").count(), 0,
+    `${label}: solar method does not expose sunrise offset control`);
+  assert.strictEqual(await page.locator("#sp-set-theme-sunset-offset").count(), 0,
+    `${label}: solar method does not expose sunset offset control`);
+  assert(!(await page.locator("#sp-set-theme-light-start").isVisible()),
+    `${label}: solar method hides time inputs`);
+  await themeModes.getByRole("button", { name: "Light" }).click();
+  const lightPreview = await page.locator(".sp-screen").evaluate((screen) => {
+    // Some layouts occupy every slot, so exercise the preview-only empty slot
+    // style with a temporary element under the same themed screen.
+    const placeholder = document.createElement("div");
+    placeholder.className = "sp-empty-cell";
+    placeholder.innerHTML = '<span class="sp-add-icon"></span>';
+    screen.appendChild(placeholder);
+    const result = {
+      background: getComputedStyle(screen).backgroundColor,
+      outline: getComputedStyle(placeholder).borderTopColor,
+      foreground: getComputedStyle(placeholder.querySelector(".sp-add-icon")).color,
+      card: getComputedStyle(screen).getPropertyValue("--preview-surface-card").trim(),
+      sensor: getComputedStyle(screen).getPropertyValue("--preview-surface-sensor").trim(),
+    };
+    placeholder.remove();
+    return result;
+  });
+  assert.strictEqual(lightPreview.background, "rgb(227, 227, 227)", `${label}: preview uses Light background`);
+  assert.strictEqual(lightPreview.card, "#FFFFFF", `${label}: Light cards retain their separate white fill`);
+  assert.strictEqual(lightPreview.sensor, "#F5F5F5", `${label}: Light sensors retain their separate grey fill`);
+  assert.notStrictEqual(lightPreview.outline, lightPreview.background,
+    `${label}: Light placeholder dashed outline separates from its background`);
+  assert.strictEqual(lightPreview.foreground, "rgb(51, 51, 51)",
+    `${label}: Light placeholder icon uses semantic foreground`);
+  await page.evaluate(() => window.__seedEspState([{
+    id: "text_sensor-screen__active_theme", state: "Light", value: "Light",
+  }]));
+  await themeModes.getByRole("button", { name: "Automatic" }).click();
+  assert(await page.locator(".sp-screen").evaluate((screen) => screen.classList.contains("sp-theme-light")),
+    `${label}: Auto preview follows Active Theme`);
+  await themeModes.getByRole("button", { name: "Dark" }).click();
+  const darkPreview = await page.locator(".sp-screen").evaluate((screen) => ({
+    background: getComputedStyle(screen).backgroundColor,
+    card: getComputedStyle(screen).getPropertyValue("--preview-surface-card").trim(),
+    sensor: getComputedStyle(screen).getPropertyValue("--preview-surface-sensor").trim(),
+  }));
+  assert.strictEqual(darkPreview.background, "rgb(0, 0, 0)", `${label}: Dark restores the main background`);
+  assert.strictEqual(darkPreview.card, "#313131", `${label}: Dark restores the main card fill`);
+  assert.strictEqual(darkPreview.sensor, "#212121", `${label}: Dark restores the main sensor fill`);
+  assert(!(await page.locator("#sp-set-theme-light-start").isVisible()),
+    `${label}: manual theme hides Auto inputs`);
   assert.deepStrictEqual(
     await page
       .locator("#sp-settings .sp-settings-status-title")
       .evaluateAll((nodes) => nodes.map((node) => node.textContent)),
-    options.slug === "esp32-p4-86"
-      ? ["Display", "Voice & Sounds", "Sleep & Schedule", "Preferences", "System"]
-      : ["Display", "Sleep & Schedule", "Preferences", "System"],
+    ["Display", "Sleep & Schedule", "Preferences", "System"],
     `${label}: settings groups should be ordered by purpose`,
   );
   const settingsPlacement = await page.locator("#sp-settings .sp-config").evaluate((config) => {
@@ -1347,77 +1490,9 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
       has: page.locator(".card-header h3", { hasText: /^Alarm Audio$/ }),
     })
     .first();
-  if (options.slug === "esp32-p4-86") {
-    assert.strictEqual(
-      settingsPlacement["Voice Services"]?.section,
-      "Voice & Sounds",
-      `${label}: voice services should be grouped with voice and sound controls`,
-    );
-    assert.strictEqual(
-      settingsPlacement["Alarm Audio"]?.section,
-      "Voice & Sounds",
-      `${label}: alarm audio should be grouped with voice and sound controls`,
-    );
-    assert.strictEqual(
-      settingsPlacement["Alarm Audio"]?.index,
-      settingsPlacement["Voice Services"]?.index + 1,
-      `${label}: alarm audio should appear immediately below voice services`,
-    );
-    assert(
-      await voiceServicesCard.isVisible(),
-      `${label}: voice services settings card is available for the voice-capable panel`,
-    );
-    assert(
-      await alarmDelayAudioCard.isVisible(),
-      `${label}: alarm delay audio settings are available for the speaker panel`,
-    );
-    await alarmDelayAudioCard.locator(".card-header").click();
-    const alarmDelayAudioToggle = alarmDelayAudioCard.locator("#sp-set-alarm-delay-audio");
-    async function setAlarmDelayAudioEnabled(enabled) {
-      await alarmDelayAudioToggle.evaluate((input, checked) => {
-        input.checked = checked;
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      }, enabled);
-    }
-    await setAlarmDelayAudioEnabled(true);
-    const entryAnnouncement = alarmDelayAudioCard.locator("#sp-set-alarm-delay-entry-announcement");
-    const exitAnnouncement = alarmDelayAudioCard.locator("#sp-set-alarm-delay-exit-announcement");
-    async function changeAnnouncement(input, value) {
-      await input.evaluate((element, nextValue) => {
-        element.value = nextValue;
-        element.dispatchEvent(new Event("change", { bubbles: true }));
-      }, value);
-    }
-    await changeAnnouncement(entryAnnouncement, "Updated entry announcement");
-    await changeAnnouncement(exitAnnouncement, "Updated exit announcement");
-    await setAlarmDelayAudioEnabled(false);
-    await setAlarmDelayAudioEnabled(true);
-    assert.strictEqual(
-      await entryAnnouncement.inputValue(),
-      "Updated entry announcement",
-      `${label}: entry announcement state survives settings UI synchronization`,
-    );
-    assert.strictEqual(
-      await exitAnnouncement.inputValue(),
-      "Updated exit announcement",
-      `${label}: exit announcement state survives settings UI synchronization`,
-    );
-  } else {
-    assert(
-      !clockBarText.includes("Voice Services"),
-      `${label}: voice services toggle is hidden from the clock bar`,
-    );
-    assert.strictEqual(
-      await voiceServicesCard.count(),
-      0,
-      `${label}: voice services settings card is hidden on panels without local voice`,
-    );
-    assert.strictEqual(
-      await alarmDelayAudioCard.count(),
-      0,
-      `${label}: alarm delay audio settings are hidden on panels without speaker support`,
-    );
-  }
+  assert(!clockBarText.includes("Voice Services"), `${label}: voice services are removed`);
+  assert.strictEqual(await voiceServicesCard.count(), 0, `${label}: voice settings are not shown`);
+  assert.strictEqual(await alarmDelayAudioCard.count(), 0, `${label}: alarm audio settings are not shown`);
   const nightScheduleCard = page
     .locator("#sp-settings .card")
     .filter({
@@ -1452,6 +1527,29 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
     { id: "text-screen_saver__camera_entity", state: "" },
     { id: "switch-screen_saver__clock_overlay", state: "OFF", value: false },
   ]));
+  const dateToggle = screensaverCard.locator("#sp-set-clock-date");
+  const dateRow = dateToggle.locator("..").locator("..");
+  await dimmedAction.selectOption("clock");
+  assert.strictEqual(await dateRow.isVisible(), false,
+    `${label}: old firmware hides the date toggle`);
+  await page.evaluate(() => window.__seedEspState([
+    { id: "switch-screen_saver__show_date", state: "OFF", value: false },
+  ]));
+  await dateRow.waitFor({ state: "visible", timeout: 10000 });
+  assert(await dateRow.isVisible(), `${label}: clock screensaver offers Show date`);
+  assert.strictEqual(await dateToggle.isChecked(), false, `${label}: date defaults off`);
+  await screensaverCard.locator('label[for="sp-set-clock-date"]').click();
+  await page.evaluate(() => window.__seedEspState([
+    { id: "switch-clock_screensaver_show_date", state: "ON", value: true },
+  ]));
+  assert(await dateToggle.isChecked(), `${label}: date state aliases synchronize`);
+  await screensaverCard.getByRole("button", { name: "Sensor", exact: true }).click();
+  const sensorDateToggle = screensaverCard.locator("#sp-set-sensor-clock-date");
+  assert(await sensorDateToggle.locator("..").locator("..").isVisible(), `${label}: Sensor clock also offers Show date`);
+  assert(await sensorDateToggle.isChecked(), `${label}: Sensor and Timer share date state`);
+  await screensaverCard.locator('label[for="sp-set-sensor-clock-date"]').click();
+  await screensaverCard.getByRole("button", { name: "Timer", exact: true }).click();
+  assert.strictEqual(await dateToggle.isChecked(), false, `${label}: date changes sync across modes`);
   const hasCameraScreensaver = await dimmedAction.locator('option[value="camera"]').count() > 0;
   await dimmedAction.selectOption("dim");
   assert.strictEqual(
@@ -1871,6 +1969,11 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
     `${label}: Home Assistant port should be hidden in Automatic mode`,
   );
   assert.strictEqual(
+    await homeAssistantSettingsCard.locator("#sp-set-ha-artwork-host").isVisible(),
+    false,
+    `${label}: Home Assistant host should be hidden in Automatic mode`,
+  );
+  assert.strictEqual(
     await homeAssistantSettingsCard
       .locator("#sp-set-ha-artwork-port")
       .inputValue(),
@@ -1884,7 +1987,7 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
   );
   assert.strictEqual(
     await homeAssistantSettingsCard.locator("#sp-ha-artwork-endpoint-status").textContent(),
-    "The current Home Assistant artwork endpoint is http://192.0.2.10.",
+    "Home Assistant artwork endpoint: Automatic — http://192.0.2.10.",
     `${label}: Home Assistant artwork endpoint status should render`,
   );
   const endpointModePostsBefore = posts.length;
@@ -1912,6 +2015,23 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
     `${label}: Home Assistant port should render in Manual mode`,
   );
   assert(
+    await homeAssistantSettingsCard.locator("#sp-set-ha-artwork-host").isVisible(),
+    `${label}: Home Assistant host should render in Manual mode`,
+  );
+  assert(
+    await homeAssistantSettingsCard.locator("#sp-set-ha-artwork-host").isEnabled(),
+    `${label}: Home Assistant host should be editable in Manual mode`,
+  );
+  const hostPostsBefore = posts.length;
+  await homeAssistantSettingsCard.locator("#sp-set-ha-artwork-host").fill("ha.example.test");
+  await homeAssistantSettingsCard.locator("#sp-set-ha-artwork-host").dispatchEvent("change");
+  await waitForPost(
+    posts,
+    { domain: "text", name: "home_assistant_artwork_host", value: "ha.example.test" },
+    `${label}: Home Assistant host post`,
+    hostPostsBefore,
+  );
+  assert(
     (await homeAssistantSettingsCard
       .locator("#sp-set-ha-artwork-port.sp-input--no-stepper")
       .count()) === 1,
@@ -1928,93 +2048,12 @@ async function assertSettingsPage(page, label, options = {}, posts = []) {
   assert(!overflow, `${label}: settings page has horizontal overflow`);
   await page.getByRole("tab", { name: "Screen" }).click();
   await page.waitForSelector("#sp-screen.sp-page.active");
-  await assertVoiceClockBarPreview(page, label, options.slug === "esp32-p4-86");
+  await assertVoiceClockBarPreview(page, label);
 }
 
-async function assertVoiceClockBarPreview(page, label, supported) {
+async function assertVoiceClockBarPreview(page, label) {
   const voiceItem = page.locator('[data-clockbar-item="voice"]');
-  if (!supported) {
-    assert.strictEqual(
-      await voiceItem.count(),
-      0,
-      `${label}: voice services clock bar item is not rendered on panels without local voice`,
-    );
-    return;
-  }
-
-  assert.strictEqual(
-    await voiceItem.count(),
-    1,
-    `${label}: voice services clock bar item is rendered on the voice-capable panel`,
-  );
-  await page.evaluate(() =>
-    window.__seedEspState([
-      { id: "switch-voice_services", state: "ON", value: true },
-      { id: "switch-screen__network_status_icon", state: "OFF", value: false },
-    ]),
-  );
-  await page.waitForFunction(() => {
-    var voice = document.querySelector(
-      '[data-clockbar-item="voice"] .sp-voice-preview',
-    );
-    return voice && voice.className.indexOf("sp-visible") !== -1;
-  });
-
-  const preview = await page.evaluate(() => {
-    function box(selector) {
-      var el = document.querySelector(selector);
-      if (!el) return null;
-      var rect = el.getBoundingClientRect();
-      return {
-        className: el.className,
-        left: rect.left,
-        right: rect.right,
-        width: rect.width,
-        height: rect.height,
-      };
-    }
-    return {
-      voice: box('[data-clockbar-item="voice"]'),
-      network: box('[data-clockbar-item="network"]'),
-      voiceIcon: box('[data-clockbar-item="voice"] .sp-voice-preview'),
-      networkIcon: box('[data-clockbar-item="network"] .sp-network-preview'),
-    };
-  });
-  assert(
-    preview.voice && preview.network,
-    `${label}: voice and network clock bar items are measurable`,
-  );
-  assert(
-    preview.voice.right <= preview.network.left + 1,
-    `${label}: voice mic is positioned to the left of connectivity`,
-  );
-  assert(
-    !preview.voice.className.includes("sp-clockbar-hidden"),
-    `${label}: voice item stays active when connectivity is hidden`,
-  );
-  assert(
-    preview.network.className.includes("sp-clockbar-hidden"),
-    `${label}: network item is hidden independently of voice`,
-  );
-  assert(
-    preview.voiceIcon.className.includes("sp-visible"),
-    `${label}: voice mic remains visible when connectivity is hidden`,
-  );
-  assert(
-    preview.voiceIcon.width > 0 && preview.voiceIcon.height > 0,
-    `${label}: voice mic remains measurable when connectivity is hidden`,
-  );
-  assert(
-    preview.networkIcon.className.includes("sp-visible"),
-    `${label}: hidden connectivity keeps its placeholder icon visible`,
-  );
-
-  await page.evaluate(() =>
-    window.__seedEspState([
-      { id: "switch-voice_services", state: "OFF", value: false },
-      { id: "switch-screen__network_status_icon", state: "ON", value: true },
-    ]),
-  );
+  assert.strictEqual(await voiceItem.count(), 0, `${label}: voice clock bar item is removed`);
 }
 
 async function assertClockBarTypographyAndIconLayout(page, label) {
@@ -2822,6 +2861,14 @@ async function assertAllCardSettingsGrouped(page, posts, label) {
     );
   }
 
+  async function cardSettingsSectionCount() {
+    return page
+      .locator(".sp-settings-modal .sp-panel > .sp-disclosure > .sp-disclosure-button > span:first-child")
+      .evaluateAll((labels) =>
+        labels.filter((label) => String(label.textContent || "").trim() === "Card Settings").length,
+      );
+  }
+
   const cardOptions = await page
     .locator(".sp-card-type-option:not([disabled])")
     .evaluateAll((options) =>
@@ -2859,15 +2906,15 @@ async function assertAllCardSettingsGrouped(page, posts, label) {
         `${label}: Screen Lock should not show an unused Entity field`,
       );
       assert.strictEqual(
-        await page.locator(".sp-settings-modal .sp-panel > .sp-disclosure").count(),
+        await cardSettingsSectionCount(),
         0,
-        `${label}: Screen Lock should not show unused generic Card Settings`,
+        `${label}: Screen Lock uses dedicated Pin Protection and Screensaver panels`,
       );
     }
 
     if (cardOption.value === "weather") {
       assert.strictEqual(
-        await page.locator(".sp-settings-modal .sp-panel > .sp-disclosure").count(),
+        await cardSettingsSectionCount(),
         0,
         `${label}: Weather current conditions should not show empty Card Settings`,
       );
@@ -2894,7 +2941,7 @@ async function assertAllCardSettingsGrouped(page, posts, label) {
         await assertGrouped(`${cardOption.label} / ${typeValue || "default"}`);
         if (cardOption.value === "weather" && typeValue) {
           assert.strictEqual(
-            await page.locator(".sp-settings-modal .sp-panel > .sp-disclosure").count(),
+            await cardSettingsSectionCount(),
             1,
             `${label}: Weather forecasts should group their extra settings`,
           );
@@ -3213,6 +3260,47 @@ async function assertCoverSettingsPanels(page, label) {
   });
 }
 
+async function assertCameraRefreshSettings(page, posts, label) {
+  await page.getByRole("tab", { name: "Screen" }).click();
+  const before = posts.length;
+  await page.locator(".sp-empty-cell:not(.sp-info-only-hidden)").first().click();
+  await page.waitForSelector(".sp-settings-overlay.sp-visible");
+  await page.getByRole("button", { name: "Camera Card card type", exact: true }).click();
+  await page.locator("#sp-inp-entity").fill("camera.front_door");
+  await page.locator("#sp-inp-entity").dispatchEvent("change");
+  await page.locator(".sp-settings-modal .sp-disclosure").filter({ hasText: "Refresh Settings" })
+    .locator("> .sp-disclosure-button").click();
+  const mode = page.locator("#sp-inp-image-refresh-mode");
+  const interval = page.locator("#sp-inp-image-refresh-interval");
+  const trigger = page.locator("#sp-inp-image-refresh-trigger");
+  assert.strictEqual(await page.locator(".sp-settings-modal .sp-disclosure").filter({ hasText: "Modal Settings" })
+    .locator("#sp-inp-image-refresh-mode").count(), 0,
+    `${label}: refresh controls must sit outside Modal Settings`);
+  assert(await page.getByText("On activity refreshes them every 5 seconds for 30 seconds.", { exact: false }).count() === 1);
+  assert.strictEqual(await mode.inputValue(), "off", `${label}: camera refresh is opt-in`);
+  assert(!(await interval.isVisible()));
+  await mode.selectOption("periodic");
+  assert.strictEqual(await interval.inputValue(), "10");
+  await interval.selectOption("5");
+  assert(!(await trigger.isVisible()));
+  await mode.selectOption("activity");
+  assert(await trigger.isVisible());
+  assert(!(await interval.isVisible()));
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const error = page.getByText("Choose a binary sensor or event entity for activity refresh.", { exact: true });
+  assert(await error.isVisible());
+  await trigger.fill("camera.other");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  assert(await error.isVisible());
+  await trigger.fill("event.doorbell");
+  assert.strictEqual(await error.count(), 0);
+  assert.strictEqual(posts.length, before, `${label}: invalid refresh drafts must not save`);
+  await page.locator("#sp-inp-entity").fill("image.front_door");
+  assert(!(await mode.isVisible()), `${label}: image entities use revision events instead of polling controls`);
+  await page.locator(".sp-settings-close").click();
+  await page.waitForFunction(() => !document.querySelector(".sp-settings-overlay").classList.contains("sp-visible"));
+}
+
 async function assertMediaCoverArtSettingsPanels(page, label) {
   await page.getByRole("tab", { name: "Screen" }).click();
   await page.waitForSelector("#sp-screen.sp-page.active");
@@ -3520,6 +3608,102 @@ async function assertNumberActionRequiresValue(page, posts, label) {
   );
 }
 
+async function assertMediaModalSettingsJourney(browser, testCase) {
+  const context = await browser.newContext({ viewport: testCase.viewport });
+  await installRoutes(context, testCase.slug);
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await installFakeEventSource(page);
+  const defaults = ["controls", "progress", "volume", "speakers", "power"];
+  const rows = page.locator("#sp-inp-media-modal-settings").locator("..").locator(".sp-light-tab-row");
+  async function openEditor() {
+    await page.locator('.sp-main [data-slot="4"]').click();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.waitForSelector(".sp-settings-overlay.sp-visible");
+  }
+  async function saveEditor() {
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector(".sp-settings-overlay").classList.contains("sp-visible"));
+  }
+  async function order() {
+    return rows.evaluateAll((items) => items.map((row) => row.getAttribute("data-tab")));
+  }
+  try {
+    await page.goto(`http://espcontrol.test/${testCase.slug}?events=1`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#sp-app");
+    await page.waitForFunction(() => window.__eventSources?.length > 0);
+    await page.evaluate((events) => window.__seedEspState(events), seededEvents());
+    await page.getByRole("tab", { name: "Screen" }).click();
+    await openEditor();
+    await page.locator("#sp-inp-media-mode").selectOption("control_modal");
+    await page.getByRole("button", { name: "Modal Settings", exact: true }).click();
+    assert.deepStrictEqual(await order(), defaults, `${testCase.name}: default media tab order`);
+    assert(!(await page.locator("#sp-inp-media-tab-power").isChecked()), `${testCase.name}: Power starts off`);
+    assert(await page.locator("#sp-inp-media-tab-power").isDisabled(), `${testCase.name}: Power needs an optional entity`);
+    await page.getByRole("button", { name: "Optional Power", exact: true }).click();
+    const power = page.getByLabel("Power Entity", { exact: true });
+    assert(await power.evaluate((input) => !!input.closest(".sp-disclosure").parentElement.closest(".sp-disclosure").querySelector("#sp-inp-media-modal-settings")), `${testCase.name}: Optional Power belongs inside Modal Settings`);
+    assert.strictEqual(await page.locator("#sp-inp-media-power-info").count(), 0, `${testCase.name}: optional power has no info text`);
+    await power.fill("media_player.living_room_tv");
+    await power.blur();
+    assert(await page.locator("#sp-inp-media-tab-power").isChecked(), `${testCase.name}: adding an entity enables Power`);
+    assert(!(await page.locator("#sp-inp-media-tab-power").isDisabled()), `${testCase.name}: Power is available with an entity`);
+    for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Move Power up", exact: true }).click();
+    assert.strictEqual((await order())[0], "power", `${testCase.name}: arrows move Power first`);
+    await page.locator("#sp-inp-media-tab-progress").locator("..").click();
+    await rows.filter({ has: page.locator("#sp-inp-media-tab-volume") }).dragTo(
+      rows.filter({ has: page.locator("#sp-inp-media-tab-power") }), { targetPosition: { x: 10, y: 2 } });
+    assert.deepStrictEqual((await order()).slice(0, 2), ["volume", "power"], `${testCase.name}: dragging saves the tab order`);
+    assert.strictEqual(await power.inputValue(), "media_player.living_room_tv", `${testCase.name}: tab changes retain the separate power device`);
+    await saveEditor();
+    await openEditor();
+    const modes = testCase.mediaCoverArtSupported ? ["cover_art", "control_modal"] : ["control_modal"];
+    for (const mode of modes) {
+      await page.locator("#sp-inp-media-mode").selectOption(mode);
+      await page.getByRole("button", { name: "Modal Settings", exact: true }).click();
+      await page.getByRole("button", { name: "Optional Power", exact: true }).click();
+      assert.deepStrictEqual((await order()).slice(0, 2), ["volume", "power"], `${testCase.name}: ${mode} retains order`);
+      assert.strictEqual(await page.locator("#sp-inp-media-tab-progress").isChecked(), false, `${testCase.name}: ${mode} retains hidden tabs`);
+      assert.strictEqual(await power.inputValue(), "media_player.living_room_tv", `${testCase.name}: ${mode} retains power entity`);
+      await saveEditor();
+      await openEditor();
+    }
+    await page.getByRole("button", { name: "Modal Settings", exact: true }).click();
+    await page.getByRole("button", { name: "Optional Power", exact: true }).click();
+    for (const tab of ["power", "controls", "speakers"]) await page.locator(`#sp-inp-media-tab-${tab}`).locator("..").click();
+    await page.locator("#sp-inp-media-tab-volume").locator("..").click();
+    assert(await page.locator("#sp-inp-media-tab-volume").isChecked(), `${testCase.name}: the last tab stays enabled`);
+    assert.strictEqual(await power.inputValue(), "media_player.living_room_tv", `${testCase.name}: hiding Power keeps its entity`);
+    await power.fill("");
+    await power.fill("media_player.living_room_tv");
+    await power.blur();
+    assert(await page.locator("#sp-inp-media-tab-power").isChecked(), `${testCase.name}: re-entering an entity enables Power without interrupting typing`);
+    assert.strictEqual((await order())[0], "volume", `${testCase.name}: adding power preserves custom tab order`);
+
+    await power.fill("");
+    await power.blur();
+    assert(!(await page.locator("#sp-inp-media-tab-power").isChecked()), `${testCase.name}: clearing the entity switches Power off`);
+    assert(await page.locator("#sp-inp-media-tab-power").isDisabled(), `${testCase.name}: clearing the entity makes Power unavailable`);
+    await saveEditor();
+    await openEditor();
+    for (const mode of modes) {
+      await page.locator("#sp-inp-media-mode").selectOption(mode);
+      await page.getByRole("button", { name: "Modal Settings", exact: true }).click();
+      assert(!(await page.locator("#sp-inp-media-tab-power").isChecked()), `${testCase.name}: ${mode} keeps Power off after clearing`);
+      assert(await page.locator("#sp-inp-media-tab-power").isDisabled(), `${testCase.name}: ${mode} keeps Power unavailable after clearing`);
+      await saveEditor();
+      await openEditor();
+    }
+
+    await page.locator("#sp-inp-media-mode").selectOption("volume");
+    assert.strictEqual(await page.getByRole("button", { name: "Modal Settings", exact: true }).count(), 0, `${testCase.name}: simple media types have no modal tab settings`);
+    assert.deepStrictEqual(errors, [], `${testCase.name}: media modal settings have no browser errors`);
+  } finally {
+    await context.close();
+  }
+}
+
 async function assertSpeakerGroupEditorAndPreview(page, posts, label) {
   await page.getByRole("tab", { name: "Screen" }).click();
   await page.waitForSelector("#sp-screen.sp-page.active");
@@ -3549,6 +3733,25 @@ async function assertSpeakerGroupEditorAndPreview(page, posts, label) {
     await page.waitForSelector(".sp-settings-overlay.sp-visible");
     assert.strictEqual(await page.getByLabel("Name", { exact: true }).inputValue(), name, `${label}: reopening All Controls must preserve ${name}`);
   }
+  await page.getByRole("button", { name: "Modal Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Optional Power", exact: true }).click();
+  const powerEntity = page.getByLabel("Power Entity", { exact: true });
+  await powerEntity.fill("media_player.living_room_tv");
+  await powerEntity.blur();
+  assert.strictEqual(await powerEntity.inputValue(), "media_player.living_room_tv", `${label}: typing and blurring retain the power entity`);
+  await page.getByRole("button", { name: "Card Settings", exact: true }).click();
+  await page.locator(".sp-settings-modal").getByRole("button", { name: "Volume", exact: true }).click();
+  assert.strictEqual(await powerEntity.inputValue(), "media_player.living_room_tv", `${label}: power entity survives editor rerender`);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector(".sp-settings-overlay").classList.contains("sp-visible"));
+  await page.locator('.sp-main [data-slot="4"]').click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Modal Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Optional Power", exact: true }).click();
+  assert.strictEqual(await powerEntity.inputValue(), "media_player.living_room_tv", `${label}: saved power entity survives reopening`);
+  await powerEntity.fill("");
+  await powerEntity.blur();
+  assert.strictEqual(await powerEntity.inputValue(), "", `${label}: clearing the override restores the default`);
   const advanced = page.locator(".sp-settings-modal .sp-disclosure").filter({
     has: page.locator("#sp-inp-media-advanced"),
   });
@@ -3584,7 +3787,10 @@ async function assertSpeakerGroupEditorAndPreview(page, posts, label) {
   assert.strictEqual(await page.locator('.sp-main [data-slot="4"] .sp-media-group-count').count(), 0, `${label}: speaker group preview should not invent a member count`);
   assert.strictEqual(await page.locator("#sp-inp-label").inputValue(), "Whole House", `${label}: speaker group should expose its preserved custom label`);
   await page.locator("#sp-inp-icon").fill("Home");
-  await page.locator("#sp-inp-icon").press("Enter");
+  const homeIconOption = page.locator(".sp-icon-dropdown .sp-icon-option").filter({
+    has: page.locator(".sp-icon-option-label", { hasText: /^Home$/ }),
+  });
+  await homeIconOption.click();
   await page.waitForSelector('.sp-main [data-slot="4"] .mdi-home', { state: "attached" });
   assert(await page.locator('.sp-main [data-slot="4"] .mdi-home').count(), `${label}: speaker group preview should use its selected icon`);
   await helper.fill("");
@@ -5468,7 +5674,7 @@ async function assertNativeProfileJourney(browser, testCase) {
     await seedNativeDocument(page, nativeState);
     if (testCase.exerciseInteractions) await assertGuestWifiSettings(page, testCase.name);
 
-    await assertSubpageTitleTypography(page, testCase.name);
+    await assertSubpageTitleTypography(page, testCase.name, nativeState);
 
     const sensor = page.locator('.sp-main [data-slot="2"]');
     assert(
@@ -5915,6 +6121,7 @@ async function runCase(browser, testCase) {
       await assertFanOptionalLightSettings(page, testCase.name);
       await assertWebhookSettingsPanel(page, posts, testCase.name);
       await assertNumberActionRequiresValue(page, posts, testCase.name);
+      await assertCameraRefreshSettings(page, posts, testCase.name);
     }
     await assertInternalControlsPanel(page, posts, testCase.name);
     await assertEmptyCellSettings(page, posts, testCase.name);
@@ -5957,6 +6164,22 @@ async function assertHostedCompatibility(browser) {
   const testCase = CASES.find(item => item.slug === "guition-esp32-p4-jc8012p4a1-v2");
   const context = await browser.newContext({ viewport: testCase.viewport });
   await installRoutes(context, testCase.slug, { nativeState: nativeConfigState(testCase.slug) });
+  const firmwareBody = "test firmware download";
+  let releaseDownload;
+  const downloadReady = new Promise(resolve => { releaseDownload = resolve; });
+  await context.route("https://jtenniswood.github.io/**/*.ota.bin", async route => {
+    await downloadReady;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/octet-stream",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: firmwareBody,
+    });
+  });
+  const uploads = [];
+  context.on("request", request => {
+    if (new URL(request.url()).pathname === "/update") uploads.push(request);
+  });
   await context.addInitScript(() => {
     const transport = window.fetch.bind(window);
     window.__compatRequests = [];
@@ -5989,11 +6212,73 @@ async function assertHostedCompatibility(browser) {
     await page.evaluate(() => window.__seedEspState([
       { id: "select/Home Assistant Artwork Connection", state: "Manual" },
       { id: "text_sensor/Home Assistant Artwork Endpoint", state: "Manual — http://ha.test:8123" },
+      { id: "text_sensor/Home Assistant Artwork Connection Health", state: "Manual connection" },
     ]));
     assert.equal(await page.locator("#sp-set-ha-artwork-endpoint-mode").inputValue(), "Manual");
-    assert.equal(await page.locator("#sp-ha-artwork-endpoint-status").textContent(), "The current Home Assistant artwork endpoint is http://ha.test:8123.");
+    assert.equal(await page.locator("#sp-ha-artwork-endpoint-status").textContent(), "Home Assistant artwork endpoint: Manual — http://ha.test:8123.");
+    assert.equal(await page.locator("#sp-ha-artwork-endpoint-health").textContent(), "Manual connection");
     assert(!unhandled.some(message => message.includes("Home Assistant Artwork")), "display-name artwork events are handled");
+    const firmwareCard = page.locator(".card").filter({ has: page.locator(".card-header h3", { hasText: /^Firmware$/ }) });
+    await firmwareCard.locator(":scope > .card-header").click();
+    await page.locator("#sp-fw-previous-panel .sp-disclosure-button").click();
+    page.once("dialog", dialog => dialog.accept());
+    await page.locator("#sp-fw-previous-panel .sp-fw-btn").click();
+    await page.waitForFunction(() => window.__compatRequests.some(item => item.url.endsWith(".ota.bin")));
+    const download = await page.evaluate(() => window.__compatRequests.find(item => item.url.endsWith(".ota.bin")));
+    assert.equal(download.credentials, "omit", "public firmware downloads must not include browser credentials");
+    await page.evaluate(() => window.__seedEspState([
+      { id: "update-firmware__update", state: "NO UPDATE", current_version: "v1.12.0", latest_version: "v1.13.0" },
+    ]));
+    assert.equal(await page.locator("#sp-fw-previous-panel .sp-fw-btn").innerText(), "Installing…", "routine status must not cancel a pending download");
+    assert(await page.locator("#sp-fw-previous-panel .sp-fw-btn").isDisabled(), "duplicate uploads stay disabled");
+    releaseDownload();
+    await page.waitForFunction(() => window.__compatRequests.some(item => item.url.endsWith("/update") && item.status === 204));
+    const upload = await page.evaluate(() => window.__compatRequests.find(item => item.url.endsWith("/update")));
+    assert.equal(upload.credentials, "include", "firmware uploads retain device authentication");
+    assert.equal(uploads.length, 1, "previous firmware is uploaded once");
+    assert.equal(uploads[0].method(), "POST");
+    assert(uploads[0].postData().includes(firmwareBody), "the downloaded firmware reaches the device upload");
+    assert(uploads[0].postData().includes(`${testCase.slug}.ota.bin`), "the upload retains the device firmware filename");
+    await page.getByText("Firmware uploaded. Waiting for device to restart…", { exact: true }).waitFor();
   } finally { await context.close(); }
+}
+
+async function assertFirmwareRetryFeedback(browser) {
+  const testCase = CASES.find(item => item.slug === "guition-esp32-p4-jc8012p4a1-v2");
+  for (const action of ["check", "install", "check_then_install"]) {
+    const context = await browser.newContext({ viewport: testCase.viewport });
+    await installRoutes(context, testCase.slug, { nativeState: nativeConfigState(testCase.slug) });
+    await context.route("https://jtenniswood.github.io/**/*.ota.bin", route => route.fulfill({
+      status: 503, headers: { "Access-Control-Allow-Origin": "*" }, body: "Unavailable",
+    }));
+    const page = await context.newPage();
+    await installFakeEventSource(page);
+    try {
+      await page.goto(`http://espcontrol.test/${testCase.slug}?events=1`);
+      await page.waitForSelector("#sp-app");
+      await page.waitForFunction(() => window.__eventSources?.length > 0);
+      await page.evaluate(events => window.__seedEspState(events), seededEvents());
+      await page.getByRole("tab", { name: "Settings" }).click();
+      const card = page.locator(".card").filter({ has: page.locator(".card-header h3", { hasText: /^Firmware$/ }) });
+      await card.locator(":scope > .card-header").click();
+      await page.locator("#sp-fw-previous-panel .sp-disclosure-button").click();
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#sp-fw-previous-panel .sp-fw-btn").click();
+      const status = page.locator("#sp-fw-updates-panel .sp-fw-status");
+      await page.waitForFunction(() => document.querySelector("#sp-fw-updates-panel .sp-fw-status")?.textContent.includes("Firmware update failed"));
+      await page.evaluate(action => window.__seedEspState([{
+        id: "update-firmware__update",
+        state: action === "install" ? "UPDATE AVAILABLE" : "NO UPDATE",
+        current_version: action === "check" ? "v1.13.0" : "v1.12.0",
+        latest_version: "v1.13.0",
+      }]), action);
+      assert((await status.textContent()).includes("Firmware update failed"), `${action}: idle refresh preserves failure`);
+      await page.locator("#sp-fw-updates-panel .sp-disclosure-button").click();
+      await page.locator("#sp-fw-updates-panel .sp-fw-btn").click();
+      assert(!(await status.textContent()).includes("Firmware update failed"), `${action}: new attempt clears previous failure`);
+      assert.equal(await page.locator("#sp-fw-updates-panel .sp-fw-btn").innerText(), action === "check" ? "Checking…" : "Installing…");
+    } finally { await context.close(); }
+  }
 }
 
 async function assertResetControls(browser) {
@@ -6023,12 +6308,28 @@ async function assertResetControls(browser) {
           await dialog.dismiss();
           assert.fail("Complete reset must not open a browser prompt");
         });
-        const confirmation = page.getByRole("dialog", { name: "Complete reset?", exact: true });
+        const confirmation = page.getByRole("dialog", { name: "Complete reset", exact: true });
         await card.getByRole("button", { name: label, exact: true }).click();
         assert(await confirmation.isVisible());
-        assert.strictEqual(await confirmation.locator("input").count(), 0);
+        if (process.env.ESPCONTROL_RESET_SCREENSHOT) {
+          await page.screenshot({ path: process.env.ESPCONTROL_RESET_SCREENSHOT });
+        }
+        const confirmationInput = confirmation.getByRole("textbox", { name: "Type RESET to confirm", exact: true });
+        const resetButton = confirmation.getByRole("button", { name: label, exact: true });
+        assert(await confirmationInput.evaluate(el => el === document.activeElement));
+        assert(await resetButton.isDisabled());
+        assert(await confirmation.locator(".sp-reset-warning").isVisible());
+        await page.setViewportSize({ width: 320, height: 700 });
+        assert(await confirmation.evaluate(el => el.scrollWidth <= el.clientWidth), "confirmation must fit a narrow phone");
+        await page.setViewportSize(testCase.viewport);
+        assert((await confirmation.innerText()).includes("Saved Wi-Fi credentials and the Home Assistant API key will be erased."));
+        for (const text of ["", "reset", " RESET", "RESET ", "RESE"]) {
+          await confirmationInput.fill(text);
+          await confirmationInput.press("Enter");
+          assert(await resetButton.isDisabled());
+          assert.strictEqual(resetState.requests.length, 0, "invalid typed confirmation must not reset");
+        }
         assert.strictEqual(resetState.requests.length, 0, "opening confirmation must not reset");
-        assert(await confirmation.getByRole("button", { name: "Cancel", exact: true }).evaluate(el => el === document.activeElement));
         await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
         await confirmation.waitFor({ state: "detached" });
         assert.strictEqual(resetState.requests.length, 0, "cancel must not reset");
@@ -6037,7 +6338,13 @@ async function assertResetControls(browser) {
         await confirmation.waitFor({ state: "detached" });
         assert.strictEqual(resetState.requests.length, 0, "Escape must not reset");
         await card.getByRole("button", { name: label, exact: true }).click();
-        await confirmation.getByRole("button", { name: label, exact: true }).click();
+        assert.strictEqual(await confirmationInput.inputValue(), "", "reopening must clear confirmation");
+        await confirmationInput.fill("RESET");
+        assert(await resetButton.isEnabled());
+        await confirmationInput.fill("RESE");
+        assert(await resetButton.isDisabled(), "editing confirmation must disable reset again");
+        await confirmationInput.fill("RESET");
+        await resetButton.click();
       } else {
         page.once("dialog", dialog => dialog.dismiss());
         await card.getByRole("button", { name: label, exact: true }).click();
@@ -6113,7 +6420,7 @@ async function assertPanelNaming(browser) {
     await card.getByText("Could not read the panel name. Check the connection and try again.").waitFor();
     identityState.failLoad = false;
     await card.getByRole("button", { name: "Try again", exact: true }).click();
-    await page.waitForFunction(() => document.title === "EspControl — Kitchen");
+    await page.waitForFunction(() => document.title === "EspControl - Kitchen");
     assert.strictEqual(await page.locator(".sp-brand").textContent(), "EspControl Kitchen");
     const save = card.getByRole("button", { name: "Save & Restart", exact: true });
     assert(await save.isDisabled(), "unchanged names cannot be saved");
@@ -6122,13 +6429,13 @@ async function assertPanelNaming(browser) {
     if (process.env.ESPCONTROL_NAMING_SCREENSHOT) await page.screenshot({ path: process.env.ESPCONTROL_NAMING_SCREENSHOT, fullPage: true });
     identityState.failSave = true;
     await save.click();
-    await page.waitForFunction(() => document.querySelector('[role="status"]')?.textContent?.includes("Could not save"));
+    await page.waitForFunction(() => document.querySelector('#sp-panel-name')?.closest('.card')?.querySelector('[role="status"]')?.textContent?.includes("Could not save"));
     assert.strictEqual(restartRequests.length, 0, "failed save must not restart");
-    assert.strictEqual(await page.title(), "EspControl — Kitchen");
+    assert.strictEqual(await page.title(), "EspControl - Kitchen");
     identityState.failSave = false;
     await save.click();
     await page.waitForSelector("dialog[open]");
-    await page.waitForFunction(() => document.title === "EspControl — Office");
+    await page.waitForFunction(() => document.title === "EspControl - Office");
     assert.strictEqual(await page.locator("dialog a").first().getAttribute("href"), "http://office-b2c3.local/");
     await page.waitForTimeout(500);
     assert.strictEqual(restartRequests.length, 1, "successful save requests one restart");
@@ -6150,17 +6457,229 @@ async function assertPanelNaming(browser) {
     await importBackup(page, backup, "restore-source-name");
     await page.getByRole("checkbox", { name: "Also restore panel name" }).check();
     await page.getByRole("button", { name: "Restore", exact: true }).click();
-    await page.waitForFunction(() => document.title === "EspControl — Bedroom");
+    await page.waitForFunction(() => document.title === "EspControl - Bedroom");
     assert.strictEqual(identityState.info.hostname, "bedroom-b2c3", "selected name restore keeps destination suffix");
     assert.strictEqual(identityState.posts.length, 3, "name written once after successful restore");
     assert.deepStrictEqual(errors, [], "naming journey has no browser errors");
   } finally { await context.close(); }
 }
 
+async function assertScreensaverPinSettings(browser) {
+  const testCase = ACTIVE_CASES[0];
+  const context = await browser.newContext({ viewport: testCase.viewport });
+  const pin = { enabled: false, pin: "", randomize: true, posts: [], failSave: false };
+  const resetState = { epoch: 3, pending: false, requests: [] };
+  await installRoutes(context, testCase.slug, { screensaverPinState: pin, resetState });
+  const page = await context.newPage();
+  await installFakeEventSource(page);
+  try {
+    await page.goto(`http://espcontrol.test/${testCase.slug}?events=1`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#sp-app");
+    await page.waitForFunction(() => window.__eventSources?.length > 0);
+    await page.evaluate(events => window.__seedEspState(events), seededEvents());
+    await page.getByRole("tab", { name: "Settings" }).click();
+    const card = page.locator("#sp-settings .card").filter({ has: page.locator("#sp-set-screensaver-pin") });
+    await card.locator(".card-header").click();
+    const input = page.locator("#sp-set-screensaver-pin");
+    await input.waitFor({ state: "hidden" });
+    assert.strictEqual(await input.getAttribute("type"), "password");
+    const enable = page.locator("#sp-set-screensaver-pin-enabled + .sp-toggle-track");
+    const randomize = page.locator("#sp-set-screensaver-pin-randomize");
+    const randomizeTrack = page.locator("#sp-set-screensaver-pin-randomize + .sp-toggle-track");
+    await enable.click();
+    assert.strictEqual(await page.locator("#sp-set-screensaver-pin-enabled").isChecked(), true);
+    await input.waitFor({ state: "visible" });
+    await randomizeTrack.click();
+    assert.strictEqual(pin.posts.length, 0, "cannot enable protection without a saved PIN");
+    assert.strictEqual(pin.enabled, false, "opening PIN setup does not persist protection");
+    await input.fill("0042");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#sp-app");
+    await page.waitForFunction(() => window.__eventSources?.length > 0);
+    await page.evaluate(events => window.__seedEspState(events), seededEvents());
+    await page.getByRole("tab", { name: "Settings" }).click();
+    await card.locator(".card-header").click();
+    await page.waitForFunction(() => !document.querySelector("#sp-set-screensaver-pin-enabled").disabled);
+    assert.strictEqual(await page.locator("#sp-set-screensaver-pin-enabled").isChecked(), false,
+      "refresh discards setup without a saved PIN");
+    await input.waitFor({ state: "hidden" });
+    assert.strictEqual(await input.inputValue(), "", "refresh clears the unsaved PIN");
+    assert.strictEqual(await randomize.isChecked(), true, "refresh discards the unsaved layout choice");
+    await enable.click();
+    await input.waitFor({ state: "visible" });
+    await randomizeTrack.click();
+    pin.failSave = true;
+    await input.fill("0042");
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await card.getByRole("alert").getByText("Could not save or read PIN settings. Check the connection and try again.", { exact: true }).waitFor();
+    assert.strictEqual(await page.locator("#sp-set-screensaver-pin-enabled").isChecked(), true,
+      "failed save keeps PIN setup open");
+    assert.strictEqual(await input.inputValue(), "0042", "failed save preserves the entry for retry");
+    assert.strictEqual(pin.enabled, false, "failed save leaves protection disabled");
+    pin.failSave = false;
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#sp-set-screensaver-pin").value === "");
+    assert.strictEqual(pin.pin, "0042");
+    assert.strictEqual(pin.enabled, true, "saving the required PIN enables protection");
+    assert.strictEqual(pin.randomize, false, "first PIN save includes the layout preference");
+    assert.strictEqual(await input.getAttribute("placeholder"), "••••", "mask length matches saved PIN");
+    await input.fill("004200");
+    await randomizeTrack.click();
+    await page.waitForFunction(() => !document.querySelector("#sp-set-screensaver-pin-randomize").disabled);
+    assert.strictEqual(pin.randomize, true, "saved PIN layout can be changed independently");
+    assert.strictEqual(pin.pin, "0042", "layout update preserves stored PIN");
+    assert.strictEqual(await input.inputValue(), "004200", "layout update preserves an unsaved replacement PIN");
+    await enable.click();
+    await page.waitForFunction(() => !document.querySelector("#sp-set-screensaver-pin-enabled").disabled);
+    assert.strictEqual(pin.enabled, false);
+    await input.waitFor({ state: "hidden" });
+    await enable.click();
+    await page.waitForFunction(() => !document.querySelector("#sp-set-screensaver-pin-enabled").disabled);
+    assert.strictEqual(pin.pin, "0042", "disable preserves secret");
+    await input.waitFor({ state: "visible" });
+    await input.fill("12bad");
+    const count = pin.posts.length;
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    assert.strictEqual(pin.posts.length, count, "invalid PIN stays local");
+    await input.fill("6789");
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#sp-set-screensaver-pin").value === "");
+    assert.strictEqual(pin.pin, "6789");
+    pin.failSave = true;
+    await input.fill("1111");
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await card.getByText("Could not save or read PIN settings. Check the connection and try again.", { exact: true }).waitFor();
+    assert.strictEqual(pin.pin, "6789", "failed save preserves stored secret");
+    pin.failSave = false;
+    await card.getByRole("button", { name: "Clear", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#sp-set-screensaver-pin-enabled").checked === false &&
+      document.querySelector("#sp-set-screensaver-pin").disabled === false);
+    assert.strictEqual(pin.pin, "");
+    // A Screen Lock card edits the same PIN and cannot be saved before the
+    // device has accepted one. Manual locking does not require wake locking.
+    pin.randomize = false;
+    await page.getByRole("tab", { name: "Screen" }).click();
+    await page.locator(".sp-empty-cell:not(.sp-info-only-hidden)").first().click();
+    await page.locator('.sp-card-type-option[data-card-type="screen_lock"]').click();
+    const lockSettings = page.locator('.sp-settings-modal [data-sp-pin-settings]');
+    const lockInput = lockSettings.locator('input[type="password"]');
+    await lockInput.waitFor({ state: "visible" });
+    await page.waitForFunction(() => !document.querySelector('.sp-settings-modal input[type="password"]').disabled);
+    assert.strictEqual(await lockSettings.locator('input[id$="-randomize"]').isChecked(), false);
+    assert.strictEqual(await lockSettings.getByText('Require PIN after wake', { exact: true }).count(), 0,
+      'manual Screen Lock always requires its saved PIN');
+    assert.strictEqual(await lockSettings.getByRole('button', { name: 'Clear', exact: true }).count(), 0);
+    assert(await lockSettings.evaluate(form => {
+      const pin = form.querySelector('input[type="password"]');
+      const randomize = form.querySelector('input[id$="-randomize"]');
+      return !!(pin.compareDocumentPosition(randomize) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }), 'randomize appears below the PIN field');
+    const behavior = page.locator('.sp-settings-modal .sp-disclosure').filter({ hasText: 'Screensaver on lock' });
+    await behavior.locator('> .sp-disclosure-button').click();
+    const screensaverToggle = page.locator('.sp-settings-modal input[id$="screensaver-on-lock"]');
+    assert.strictEqual(await screensaverToggle.isChecked(), false, 'screensaver on lock defaults off');
+    await page.locator(".sp-settings-modal .sp-save-btn").click();
+    await page.getByText("Save a PIN before saving this card.", { exact: true }).waitFor();
+    await lockInput.fill("12bad");
+    await lockSettings.getByRole("button", { name: "Save", exact: true }).click();
+    await lockSettings.getByRole("alert").getByText("Enter a PIN containing 1–16 digits.").waitFor();
+    await lockInput.fill("123456");
+    pin.failSave = true;
+    await lockSettings.getByRole("button", { name: "Save", exact: true }).click();
+    await lockSettings.getByRole("alert").getByText("Could not save or read PIN settings. Check the connection and try again.").waitFor();
+    await page.locator(".sp-settings-modal .sp-save-btn").click();
+    assert(await page.locator(".sp-settings-overlay.sp-visible").isVisible(), "failed PIN write cannot save the card");
+    pin.failSave = false;
+    await lockSettings.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.sp-settings-modal input[type="password"]').value === "");
+    assert.strictEqual(pin.pin, "123456");
+    assert.strictEqual(pin.enabled, false, "card PIN can be saved without enabling automatic wake protection");
+    assert.strictEqual(await input.getAttribute("placeholder"), "••••••", "card save updates screensaver PIN controls");
+    await page.locator('.sp-settings-modal input[id$="screensaver-on-lock"] + .sp-toggle-track').click();
+    await page.locator(".sp-settings-modal .sp-save-btn").click();
+    await page.locator(".sp-settings-overlay.sp-visible").waitFor({ state: "hidden" });
+    await page.getByRole("tab", { name: "Settings" }).click();
+    await enable.click();
+    await input.waitFor({ state: "visible" });
+    assert.strictEqual(await input.getAttribute("placeholder"), "••••••");
+    await input.fill("9876");
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#sp-set-screensaver-pin").value === "");
+    await page.getByRole("tab", { name: "Screen" }).click();
+    await page.locator('.sp-main [data-slot]').filter({ hasText: "Screen Unlocked" }).first().click();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await lockInput.waitFor({ state: "visible" });
+    await page.waitForFunction(() => !document.querySelector('.sp-settings-modal input[type="password"]').disabled);
+    assert.strictEqual(await lockInput.getAttribute("placeholder"), "••••", "screensaver PIN save is visible in the card editor");
+    assert.strictEqual(await screensaverToggle.isChecked(), true, 'screensaver preference survives saving and re-opening the card');
+    await behavior.locator('> .sp-disclosure-button').click();
+    await page.locator('.sp-settings-modal input[id$="screensaver-on-lock"] + .sp-toggle-track').click();
+    await page.locator('.sp-settings-modal .sp-save-btn').click();
+    await page.locator('.sp-settings-overlay.sp-visible').waitFor({ state: 'hidden' });
+    await page.locator('.sp-main [data-slot]').filter({ hasText: 'Screen Unlocked' }).first().click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('.sp-settings-modal input[type="password"]').disabled);
+    assert.strictEqual(await screensaverToggle.isChecked(), false, 'screensaver preference can be disabled');
+    await page.locator(".sp-settings-close").click();
+    await page.getByRole("tab", { name: "Settings" }).click();
+    await card.getByRole('button', { name: 'Clear', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('#sp-set-screensaver-pin-enabled').checked &&
+      !document.querySelector('#sp-set-screensaver-pin').disabled);
+    assert.strictEqual(pin.pin, '');
+    assert.strictEqual(pin.enabled, false, 'shared PIN can still be cleared from screensaver settings');
+    // A protected destination importing an ordinary backup must clear its PIN.
+    pin.pin = "2468"; pin.enabled = true;
+    await importBackup(page, backupFixture(testCase.slug, testCase.slots), "screensaver-pin-restore");
+    await page.waitForSelector(".sp-banner.sp-success");
+    assert.strictEqual(pin.pin, "");
+    assert.strictEqual(pin.enabled, false);
+  } finally { await context.close(); }
+
+  const legacyContext = await browser.newContext({ viewport: testCase.viewport });
+  await installRoutes(legacyContext, testCase.slug);
+  const legacyPage = await legacyContext.newPage();
+  await installFakeEventSource(legacyPage);
+  try {
+    await legacyPage.goto(`http://espcontrol.test/${testCase.slug}?events=1`, { waitUntil: "domcontentloaded" });
+    await legacyPage.waitForSelector("#sp-app");
+    await legacyPage.getByRole("tab", { name: "Settings" }).click();
+    await legacyPage.waitForFunction(() => {
+      const input = document.querySelector("#sp-set-screensaver-pin");
+      return input && input.closest(".card").hidden;
+    });
+    const legacyCard = legacyPage.locator("#sp-settings .card").filter({ has: legacyPage.locator("#sp-set-screensaver-pin") });
+    assert.strictEqual(await legacyCard.isVisible(), false, "unsupported firmware hides the whole PIN panel");
+  } finally { await legacyContext.close(); }
+}
+
 (async function main() {
   const browser = await chromium.launch();
   const acceptanceOnly = process.env.ESPCONTROL_BROWSER_ACCEPTANCE_ONLY === "1";
   try {
+    if (process.env.ESPCONTROL_SUBPAGE_BACK_ONLY === "1") {
+      for (const testCase of ACTIVE_CASES) {
+        const nativeState = nativeConfigState(testCase.slug);
+        const context = await browser.newContext({ viewport: testCase.viewport });
+        await installRoutes(context, testCase.slug, { nativeState });
+        const page = await context.newPage();
+        await installFakeEventSource(page);
+        try {
+          await page.goto(`http://espcontrol.test/${testCase.slug}?events=1`, { waitUntil: "domcontentloaded" });
+          await page.waitForSelector("#sp-app");
+          await seedNativeDocument(page, nativeState);
+          await assertSubpageTitleTypography(page, testCase.name, nativeState);
+        } finally { await context.close(); }
+      }
+      console.log(`Subpage Back colour browser checks passed for ${ACTIVE_CASES.length} layouts.`);
+      return;
+    }
+    await assertScreensaverPinSettings(browser);
+    if (process.env.ESPCONTROL_PIN_ONLY === "1") { console.log("Screensaver PIN browser checks passed."); return; }
+    if (process.env.ESPCONTROL_RESET_ONLY === "1") {
+      await assertResetControls(browser);
+      console.log("Factory reset confirmation browser checks passed.");
+      return;
+    }
     await assertNamingOfflineBackups(browser);
     await assertPanelNaming(browser);
     if (process.env.ESPCONTROL_NAMING_ONLY === "1") { console.log("Panel naming browser checks passed."); return; }
@@ -6169,9 +6688,13 @@ async function assertPanelNaming(browser) {
       await assertRotationStartupOrdering(browser);
     }
     await assertHostedCompatibility(browser);
+    await assertFirmwareRetryFeedback(browser);
     await assertResetControls(browser);
     for (const testCase of ACTIVE_CASES) {
-      if (!acceptanceOnly) await runCase(browser, testCase);
+      if (!acceptanceOnly) {
+        await runCase(browser, testCase);
+        await assertMediaModalSettingsJourney(browser, testCase);
+      }
       await assertNativeProfileJourney(browser, testCase);
       await assertLegacyProfileFallback(browser, testCase);
       if (testCase.exerciseInteractions) await assertLegacyRestoreVerificationFailure(browser, testCase);

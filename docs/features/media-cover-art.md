@@ -41,7 +41,7 @@ Turn on **Show Cover Art** to reveal the settings, then choose the **Media Playe
 
 ### Screensaver Settings
 
-- **Keep Screen Awake During Playback** — on by default. While Show Cover Art is enabled, this prevents normal screensaver sleep during playback and lets artwork appear after **Show After**. It has no effect while Show Cover Art is off.
+- **Keep Screen Awake During Playback** — on by default. While Show Cover Art is enabled, this prevents normal screensaver sleep during playback and lets artwork appear after **Show After** when no screensaver is already active. If the clock screensaver is showing when playback starts, cover art appears immediately. It has no effect while Show Cover Art is off.
 - **Persistent Play/Pause Control** — on by default, directly below **Keep Screen Awake During Playback** on the 4-inch square S3 and P4-86. Turn it off to hide the button and restore the full width for track details, still allowing up to three title lines. Turning it off while paused from the screensaver dismisses it without resuming playback. Larger screens always show the playback button and do not show this setting.
 - **Show After** — choose 3, 5, 10, or 30 seconds, 1 minute, or 5 minutes. The default is 10 seconds. This also controls when cover art returns after you dismiss it; every touch restarts the countdown.
 - **Show Track Details For** — available on the 4-inch square displays. Choose **Never**, 3, 5, 10, 15, 20, 30, or 60 seconds, or **Always**. The default is 5 seconds.
@@ -65,7 +65,7 @@ If cover art is shown for `TV` or `Line-in` instead of hidden, the artist line s
 
 Cover art is separate from the normal [Screensaver](/features/screensaver) mode. Use Screensaver when you want the panel to dim, show a clock, or turn off after inactivity.
 
-For artwork downloads, open **Settings > System > Home Assistant Settings**. **Connection > Automatic** discovers the Home Assistant HTTP endpoint; **Manual** lets you choose **Home Assistant Protocol** (`http` or `https`) and **Home Assistant Port**. The card shows the current artwork endpoint. See [Home Assistant Settings](/features/setup#home-assistant-settings) for discovery and fallback behavior.
+For artwork downloads, open **Settings > System > Home Assistant Settings**. **Connection > Automatic** discovers a local Home Assistant endpoint. **Manual** lets you choose **Home Assistant Host** (optional), **Home Assistant Protocol** (`http` or `https`), and **Home Assistant Port**. Leave Host blank to use the address from the ESPHome connection. Enter a DNS name such as `homeassistant.example.com` when HTTPS uses a certificate issued to that name. A self-signed certificate still needs to be trusted by the panel; this setting does not disable certificate verification. The card shows the current artwork endpoint. See [Home Assistant Settings](/features/setup#home-assistant-settings) for discovery and fallback behavior.
 
 ## Track Details Work but Artwork Is Missing
 
@@ -73,7 +73,7 @@ Playback metadata uses the native ESPHome connection; image downloads use HTTP o
 
 1. Confirm the selected player has artwork in Home Assistant.
 2. Open **Settings > System > Home Assistant Settings** and check the displayed artwork endpoint.
-3. If automatic discovery chooses an unreachable endpoint, use **Manual** with the reachable protocol and port. A reverse proxy may need **Artwork Base URL**.
+3. If automatic discovery chooses an unreachable endpoint, use **Manual** and enter the host, protocol, and port that work from the panel's network. Leave the host blank to use the panel's Home Assistant API address. Automatic discovery only trusts an advertised URL on that same IP; use Manual for a hostname-based proxy or a proxy on a different host.
 4. Retry playback. Confirm both the small Cover Art card and its expanded view load an image.
 
 Artwork availability depends on the source. If only Spotify, radio, Plex, or another source fails, capture [USB logs](/reference/collect-usb-logs) and include the source and firmware version in a report, with private URLs and credentials removed.

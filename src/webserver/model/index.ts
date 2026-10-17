@@ -52,9 +52,13 @@ export {
   decodeConfigField,
   encodeConfigField,
   legacyButtonConfigSafe,
+  lighterCardColor,
+  normalizedCardColorOptions,
+  setCardColor,
   setConfigOption,
   setConfigOptionValue,
   trimConfigFields,
+  withoutCardColorOptions,
 } from "./config_primitives";
 
 export {
@@ -122,6 +126,7 @@ export {
   normalizeHour,
   normalizeHomeAssistantArtworkPort,
   normalizeHomeAssistantArtworkProtocol,
+  normalizeHomeAssistantArtworkHost,
   normalizeHomeAssistantArtworkEndpointMode,
   normalizeBrightnessMode,
   normalizeLanguage,

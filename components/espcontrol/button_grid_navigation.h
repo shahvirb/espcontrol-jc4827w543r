@@ -27,12 +27,17 @@ struct NavigationSubpageEntry {
   std::string kind;
   lv_obj_t *screen = nullptr;
   lv_obj_t *back_button = nullptr;
+  bool back_neutral_background = true;
   BtnSlot back_slot{};
   struct Card {
     int index = 0;
     lv_obj_t *button = nullptr;
     BtnSlot slot{};
     SubpageBtn definition{};
+    int display_order = 0;
+    bool neutral_background = true;
+    bool sensor_surface = false;
+    bool secondary_surface = false;
   };
   std::vector<Card> cards;
 };
@@ -183,24 +188,6 @@ inline int navigation_slot_from_target(const std::string &target) {
   return slot;
 }
 
-inline bool navigation_is_voice_target(const std::string &target) {
-  std::string normalized = navigation_lower(navigation_trim(target));
-  return normalized == "voice" || normalized == "mic" ||
-         normalized == "microphone" || normalized == "speaker" ||
-         normalized == "volume" || normalized == "device_volume";
-}
-
-inline bool navigation_has_home_label_target(const std::string &target) {
-  std::string wanted = navigation_lower(navigation_trim(target));
-  if (wanted.empty()) return false;
-
-  for (auto &entry : navigation_home_targets()) {
-    if (entry.button == nullptr || entry.label.empty()) continue;
-    if (navigation_lower(entry.label) == wanted) return true;
-  }
-  return false;
-}
-
 inline NavigationHomeTargetEntry *navigation_find_label_target(
     const std::string &target, bool *duplicate_found = nullptr) {
   if (duplicate_found) *duplicate_found = false;
@@ -269,11 +256,6 @@ inline void navigation_refresh_subpage_label() {
     set_clock_bar_subpage_label(espcontrol_i18n(std::string("Settings")));
     return;
   }
-  const auto &volume = media_volume_modal_ui();
-  if (volume.overlay && volume.active && !volume.active->clock_bar_title.empty()) {
-    set_clock_bar_subpage_label(volume.active->clock_bar_title);
-    return;
-  }
   set_clock_bar_subpage_label(navigation_active_subpage_label());
 }
 
@@ -286,21 +268,28 @@ inline bool navigation_restore_subpage_slot(int slot) {
 }
 
 inline void navigation_register_subpage_back_button(int slot,
-                                                    const BtnSlot &back_slot) {
+                                                    const BtnSlot &back_slot,
+                                                    bool neutral_background = true) {
   NavigationSubpageEntry *entry = navigation_find_slot(slot);
   if (entry != nullptr) {
     entry->back_button = back_slot.btn;
+    entry->back_neutral_background = neutral_background;
     entry->back_slot = back_slot;
   }
 }
 
 inline void navigation_register_subpage_card(int slot, int index,
                                              const BtnSlot &card_slot,
-                                             const SubpageBtn &definition) {
+                                             const SubpageBtn &definition,
+                                             bool neutral_background,
+                                             bool sensor_surface,
+                                             bool secondary_surface = false) {
   if (index <= 0 || card_slot.btn == nullptr) return;
   NavigationSubpageEntry *entry = navigation_find_slot(slot);
   if (entry == nullptr) return;
-  entry->cards.push_back({index, card_slot.btn, card_slot, definition});
+  entry->cards.push_back({index, card_slot.btn, card_slot, definition,
+                          static_cast<int>(entry->cards.size()),
+                          neutral_background, sensor_surface, secondary_surface});
 }
 
 inline void navigation_retire_subpage(int slot, lv_obj_t *main_page_obj) {

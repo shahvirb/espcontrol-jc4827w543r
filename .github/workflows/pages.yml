@@ -8,6 +8,7 @@ on:
       - 'devices/manifest.json'
       - 'scripts/check_public_firmware.py'
       - 'scripts/check_docs_site.py'
+      - 'scripts/check_docs_installer.js'
       - 'scripts/build.py'
       - 'scripts/prepare_release_web_assets.py'
       - 'scripts/prune_actions_cache.sh'
@@ -39,7 +40,7 @@ jobs:
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Prepare self-hosted workspace
         run: rm -rf "${GITHUB_WORKSPACE}/.esphome" || sudo rm -rf "${GITHUB_WORKSPACE}/.esphome"
@@ -123,7 +124,7 @@ jobs:
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Prepare self-hosted workspace
         run: rm -rf "${GITHUB_WORKSPACE}/.esphome" || sudo rm -rf "${GITHUB_WORKSPACE}/.esphome"
@@ -297,7 +298,7 @@ jobs:
       - name: Verify firmware assets
         run: |
           MISSING=false
-          OPTIONAL_FIRMWARE_SLUGS="guition-esp32-p4-jc8012p4a1 guition-esp32-p4-jc8012p4a1-v2 guition-esp32-p4-jc8012p4a1-v3 guition-esp32-p4-jc1060p470-v2 esp32-p4-86 guition-jc4827w543r"
+          OPTIONAL_FIRMWARE_SLUGS="guition-esp32-p4-jc8012p4a1 guition-esp32-p4-jc8012p4a1-v2 guition-esp32-p4-jc8012p4a1-v3 guition-esp32-p4-jc4880p443-v3 guition-esp32-p4-jc1060p470-v2 esp32-p4-86 guition-jc4827w543r"
           for SLUG in $DEVICE_SLUGS; do
             MANIFEST="firmware/${SLUG}/manifest.json"
             if [ ! -f "$MANIFEST" ]; then
@@ -320,7 +321,7 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: [build-docs, download-firmware]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -340,7 +341,6 @@ jobs:
 
       - name: Download firmware artifact
         uses: actions/download-artifact@v8
-        continue-on-error: true
         with:
           name: firmware
           path: dist/firmware
@@ -359,6 +359,6 @@ jobs:
           python3 scripts/check_public_firmware.py
           --base-url "${{ steps.deployment.outputs.page_url }}"
           --manifest devices/manifest.json
-          --optional-stable-slugs guition-esp32-p4-jc8012p4a1 guition-esp32-p4-jc8012p4a1-v2 guition-esp32-p4-jc8012p4a1-v3 guition-esp32-p4-jc1060p470-v2 esp32-p4-86 guition-jc4827w543r
+          --optional-stable-slugs guition-esp32-p4-jc8012p4a1 guition-esp32-p4-jc8012p4a1-v2 guition-esp32-p4-jc8012p4a1-v3 guition-esp32-p4-jc4880p443-v3 guition-esp32-p4-jc1060p470-v2 esp32-p4-86 guition-jc4827w543r
           --retries 5
           --delay 20

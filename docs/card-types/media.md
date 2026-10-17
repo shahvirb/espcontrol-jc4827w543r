@@ -32,11 +32,24 @@ Add your Sonos, Spotify, Apple TV, Plex, Music Assistant, or other player integr
 ## What to Expect
 
 - Playback buttons send the matching Home Assistant media action.
+- Titles and artists display fullwidth Latin characters as ordinary letters (for example, `ＯＳＡＫＡ` becomes `OSAKA`) and omit emoji. This also applies to the Cover Art screensaver. Supported accented, Greek, and Cyrillic text is preserved; other scripts still depend on the panel's font coverage. The original Home Assistant metadata is unchanged.
 - Shuffle and Repeat appear in **All Controls** only when the player advertises support for them. A supported control stays disabled until Home Assistant reports its current state, then continues to follow changes made elsewhere.
 - Repeat cycles through **Off**, **All**, and **One**. Its icon changes to Repeat Once in **One** mode, while active Shuffle and Repeat modes use the accent colour.
 - Volume and track position follow changes made elsewhere in Home Assistant. Some players show progress but do not support seeking; some only support volume up and down rather than an exact level.
 - All Controls hides tabs that the selected player does not support. Its speaker tab appears only when compatible speakers are available.
 - For **Track, Album or Playlist**, choose the speaker, then provide the content ID or URI. You can also set the player source or input when the integration uses one.
+
+## Modal Settings
+
+For **All Controls** and **Cover Art**, open **Modal Settings** to reorder the popup tabs by dragging or using the up/down arrows, and switch off tabs you do not want. The popup opens the first available tab in your order. Unsupported tabs stay hidden; if none of your selected tabs is available, Controls remains available as a fallback.
+
+### Separate Power Device
+
+Inside **Modal Settings**, open **Optional Power** and enter a **Power Entity** to control another device from the Power tab. For example, use `media_player.living_room_sonos` as the main entity for playback and volume, and `media_player.living_room_tv` as the Power Entity for the TV. You can also select a `switch`, `input_boolean`, `light`, or `fan` entity.
+
+The Power tab follows that device's on/off state and stays disabled while its state is unknown or unavailable. Power stays off and unavailable until a Power Entity is entered. Adding an entity enables the tab automatically; you can still switch it off in the tab list. Clear Power Entity to disable the Power tab again. To control the main player's power, enter its entity here. Both **All Controls** and **Cover Art** use these settings.
+
+If the main player becomes unavailable, you can still open the popup to use the enabled Power tab while the separate power device has a known, available state. The other tabs return when the player becomes available again.
 
 ## Cover Art
 

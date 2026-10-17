@@ -321,7 +321,17 @@ def test_generated_yaml(profiles: dict[str, dict]) -> None:
         assert expected_updater in updater_line, (
             f"{slug}: firmware updater include should select {expected_updater}"
         )
-        assert f"cfg.num_slots = {profile['slots']};" in sensors, f"{slug}: sensors.yaml missing slot count"
+        portrait_slots = profile["layout"].get("portraitSlots")
+        if portrait_slots is None:
+            assert f"cfg.num_slots = {profile['slots']};" in sensors, f"{slug}: sensors.yaml missing slot count"
+        else:
+            assert f"cfg.num_slots = portrait ? {portrait_slots} : {profile['slots']};" in sensors, (
+                f"{slug}: sensors.yaml missing portrait slot capacity"
+            )
+            for slot in range(portrait_slots, profile["slots"]):
+                assert f"lv_obj_add_flag(slots[{slot}].btn, LV_OBJ_FLAG_HIDDEN);" in sensors, (
+                    f"{slug}: sensors.yaml must hide portrait-only unavailable slot {slot + 1}"
+                )
         test_native_panel_config_bindings(slug, profile, device)
         label_lines = profile["web"]["btn"]["labelLines"]
         label_lines_tall = profile["web"]["btn"]["labelLinesDouble"]
@@ -372,7 +382,7 @@ def test_v3_release_configuration() -> None:
     assert "ref: ${espcontrol_component_ref}" in package, "V3 MIPI source must use the configured component ref"
     assert "components: [mipi_dsi]" in package, "V3 must retain the patched MIPI component"
     assert "web_server:\n  ota: false" in package, "V3 browser firmware uploads must be disabled"
-    assert package.count("restore_mode: ALWAYS_OFF") >= 2, "V3 update switches must default off"
+    assert "restore_mode: ALWAYS_OFF" not in package, "V3 firmware update switches must use shared defaults"
     assert "espcontrol_component_url: \"file:///config\"" in factory
     assert "espcontrol_component_ref: \"HEAD\"" in factory
     assert 'js_include: "../docs/public/webserver/embedded/www.js"' in factory
@@ -393,6 +403,20 @@ def test_jc4827_is_usb_only_for_firmware_updates() -> None:
     assert 'name: "${entity_firmware_version}"' in disabled_updater, (
         f"{slug}: disabled updater package must retain firmware-version reporting"
     )
+
+def test_jc4880p443_v3_configuration() -> None:
+    slug = "guition-esp32-p4-jc4880p443-v3"
+    device = (ROOT / "devices" / slug / "device" / "device.yaml").read_text(encoding="utf-8")
+    package = (ROOT / "devices" / slug / "packages.yaml").read_text(encoding="utf-8")
+    original = (ROOT / "devices" / "guition-esp32-p4-jc4880p443" / "device" / "device.yaml").read_text(encoding="utf-8")
+    assert "engineering_sample: false" in device and "cpu_frequency: 360MHz" in device
+    assert "engineering_sample: true" in original, "Original profile must still target older P4 silicon"
+    assert "mode: hex" in device and "model: JC4880P443" in device
+    assert "platform: gt911" in device and "frequency: 100kHz" in device
+    assert "artwork_image, mipi_dsi]" in device, "Production P4 requires the DSI clock fix"
+    assert "url: ${espcontrol_component_url}" in device and "ref: ${espcontrol_component_ref}" in device
+    for suffix in (".yaml", ".factory.yaml", ".recovery.yaml"):
+        assert (ROOT / "builds" / f"{slug}{suffix}").is_file()
 
 
 def test_public_api_encryption_policy(profile_slugs: list[str]) -> None:
@@ -505,23 +529,6 @@ def test_p4_crash_restart_preserves_safe_mode_counter() -> None:
         assert "App.safe_reboot();" not in handler, (
             f"{slug}: crash restart must preserve the failed-boot counter"
         )
-
-
-def test_local_voice_generation_uses_capability() -> None:
-    voice_device = {
-        "slug": "semantic-voice-test",
-        "package": {"localVoiceServices": True},
-    }
-    standard_device = {
-        "slug": "esp32-p4-86",
-        "package": {"firmwareVersion": "dev"},
-    }
-    assert "open_device_volume_control" in "\n".join(
-        generate_device_slots.voice_substitution_lines(voice_device)
-    ), "local voice generation must follow the semantic capability"
-    assert "open_device_volume_control" not in "\n".join(
-        generate_device_slots.voice_substitution_lines(standard_device)
-    ), "the device slug alone must not enable local voice generation"
 
 
 def test_square_s3_reapplies_clock_bar_after_screen_changes() -> None:
@@ -1071,7 +1078,10 @@ def test_firmware_matrices(profile_slugs: list[str]) -> None:
     pr = device_matrix.pr_matrix(profiles)
     assert_profile_slugs(profile_slugs, [entry["slug"] for entry in release["include"]], "release matrix")
     assert_profile_slugs(profile_slugs, [entry["slug"] for entry in nightly["include"]], "nightly matrix")
-    assert_profile_slugs(profile_slugs, [entry["slug"] for entry in pr["include"]], "PR matrix")
+    pr_chips = [profiles[entry["slug"]]["firmware"]["build"]["chip"] for entry in pr["include"]]
+    expected_chips = {profile["firmware"]["build"]["chip"] for profile in profiles.values()}
+    assert len(pr_chips) == len(set(pr_chips)), "PR matrix repeats a chip family"
+    assert set(pr_chips) == expected_chips, "PR matrix does not cover every chip family"
 
 
 def test_public_firmware_slugs(profile_slugs: list[str]) -> None:
@@ -1092,11 +1102,11 @@ def main() -> int:
     test_generated_yaml(profiles)
     test_v3_release_configuration()
     test_jc4827_is_usb_only_for_firmware_updates()
+    test_jc4880p443_v3_configuration()
     test_public_api_encryption_policy(profile_slugs)
     test_ota_preserves_deployed_partition_layouts()
     test_upgrades_do_not_reset_saved_panel_config()
     test_p4_crash_restart_preserves_safe_mode_counter()
-    test_local_voice_generation_uses_capability()
     test_square_s3_reapplies_clock_bar_after_screen_changes()
     test_rotation_refresh_rebuilds_subpages()
     test_jc4827_rotation_setting_is_wired()

@@ -1,12 +1,18 @@
+import { buildScreensaverPinSettings } from "./screensaver_pin";
+import { resetAwareFetch } from "../api/reset_session";
 import { state } from "../state/app_instance";
 import { NTP_SERVER_DEFAULTS } from "../state/app_state";
 import { WEB_UI_COLORS } from "../state/ui_tokens";
+import { createColorSwatches } from "../components/color_swatches";
 import {
     normalizeBrightnessMode,
     normalizeLanguage,
     normalizeTemperatureUnit,
     normalizeTimeOfDay,
+    normalizeThemeMode,
+    normalizeThemeAutoMethod,
 } from "../model/settings";
+import { syncThemeSettingsUi } from "./theme_settings_ui";
 import type { ConfigCodecFeature } from "./config_codec";
 import type { UiRuntimeState } from "./state";
 import type { CoreFeature } from "./core";
@@ -39,24 +45,24 @@ export interface SettingsPageFeature {
     buildSettingsPage(...args: any[]): any;
 }
 
-export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindTextPost">, runtime: UiRuntimeState, core: Pick<CoreFeature, "syncPreviewOrientation">, layout: ApplicationLayoutState, environment: EnvironmentStateFeature, schedule: ScreenScheduleStateFeature, screensaverTimeout: ScreensaverTimeoutFeature, screenRotation: ScreenRotationFeature, appearance: AppearanceFeature, clockBar: ClockBarFeature, entityState: Pick<EntityStateFeature, "entityName" | "entityInput">, shell: Pick<ControlsShellFeature, "createActionButton" | "buildApplyBar">, requestApi: Pick<ApplicationApiFeature, "postText" | "postSelect" | "postScreensaverMode" | "postScreensaverTimeout" | "postHomeScreenTimeout">, statusPreview: Pick<AppStatusPreviewFeature, "appendTimezoneOption" | "syncInput" | "updateClock" | "updateSunInfo" | "updateTempPreview">, artworkPostApi: Pick<ArtworkPostApiFeature, "postPresenceSensorEntity" | "postClockOverlay" | "postMetadataOverlay">, schedulePostApi: Pick<ScreenSchedulePostApiFeature, "postBrightnessMode" | "postDisplayBacklightBrightness" | "postBrightnessDawnTime" | "postBrightnessDuskTime">, clockBarPostApi: Pick<ClockBarPostApiFeature, "postClockBar" | "postClockBarNightMode" | "postBatteryStatus" | "postVoiceServices">, fields: Pick<ControlsFieldsFeature, "colorField" | "condField" | "createRangeSlider" | "fieldLabel" | "makeCollapsibleCard" | "segmentControl" | "selectField" | "textInput" | "toggleRow">, helpers: Pick<SettingsPageHelpersFeature, "appendSettingsSection" | "buildAlarmDelayAudioSettingsCard" | "createScreensaverThenControls" | "createTimeInput" | "statusBadge" | "syncClockScreensaverControls" | "syncCoverArtScreensaverUi" | "syncMediaPlayerSleepPreventionUi">, scheduleSection: SettingsScheduleSectionFeature, coverArtSection: SettingsCoverArtSectionFeature, systemSection: SettingsSystemSectionFeature, preview: Pick<PreviewRenderFeature, "render">): SettingsPageFeature {
+export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindTextPost">, runtime: UiRuntimeState, core: Pick<CoreFeature, "syncPreviewOrientation">, layout: ApplicationLayoutState, environment: EnvironmentStateFeature, schedule: ScreenScheduleStateFeature, screensaverTimeout: ScreensaverTimeoutFeature, screenRotation: ScreenRotationFeature, appearance: AppearanceFeature, clockBar: ClockBarFeature, entityState: Pick<EntityStateFeature, "entityName" | "entityInput">, shell: Pick<ControlsShellFeature, "createActionButton" | "buildApplyBar">, requestApi: Pick<ApplicationApiFeature, "postText" | "postSelect" | "postNumber" | "postScreensaverMode" | "postScreensaverTimeout" | "postHomeScreenTimeout">, statusPreview: Pick<AppStatusPreviewFeature, "appendTimezoneOption" | "syncInput" | "updateClock" | "updateSunInfo" | "updateTempPreview">, artworkPostApi: Pick<ArtworkPostApiFeature, "postPresenceSensorEntity" | "postClockOverlay" | "postMetadataOverlay">, schedulePostApi: Pick<ScreenSchedulePostApiFeature, "postBrightnessMode" | "postDisplayBacklightBrightness" | "postBrightnessDawnTime" | "postBrightnessDuskTime">, clockBarPostApi: Pick<ClockBarPostApiFeature, "postClockBar" | "postClockBarNightMode" | "postBatteryStatus">, fields: Pick<ControlsFieldsFeature, "condField" | "createRangeSlider" | "fieldLabel" | "makeCollapsibleCard" | "segmentControl" | "selectField" | "textInput" | "toggleRow">, helpers: Pick<SettingsPageHelpersFeature, "appendSettingsSection" | "createScreensaverThenControls" | "createTimeInput" | "statusBadge" | "syncClockScreensaverControls" | "syncCoverArtScreensaverUi" | "syncMediaPlayerSleepPreventionUi">, scheduleSection: SettingsScheduleSectionFeature, coverArtSection: SettingsCoverArtSectionFeature, systemSection: SettingsSystemSectionFeature, preview: Pick<PreviewRenderFeature, "render">): SettingsPageFeature {
     const { render: renderPreview } = preview;
-    const { appendSettingsSection, buildAlarmDelayAudioSettingsCard, createScreensaverThenControls, createTimeInput, statusBadge, syncClockScreensaverControls, syncCoverArtScreensaverUi, syncMediaPlayerSleepPreventionUi } = helpers;
+    const { appendSettingsSection, createScreensaverThenControls, createTimeInput, statusBadge, syncClockScreensaverControls, syncCoverArtScreensaverUi, syncMediaPlayerSleepPreventionUi } = helpers;
     const { buildScreenScheduleSettingsCard } = scheduleSection;
     const { buildCoverArtSettingsCard } = coverArtSection;
     const { buildSystemSettingsCards } = systemSection;
-    const { colorField, condField, createRangeSlider, fieldLabel, makeCollapsibleCard, segmentControl, selectField, textInput, toggleRow } = fields;
+    const { condField, createRangeSlider, fieldLabel, makeCollapsibleCard, segmentControl, selectField, textInput, toggleRow } = fields;
     const { createActionButton, buildApplyBar } = shell;
     const { entityName, entityInput } = entityState;
-    const { postText, postSelect, postScreensaverMode, postScreensaverTimeout, postHomeScreenTimeout } = requestApi;
+    const { postText, postSelect, postNumber, postScreensaverMode, postScreensaverTimeout, postHomeScreenTimeout } = requestApi;
     const { bindTextPost } = codec;
     const { appendTimezoneOption, syncInput, updateClock, updateSunInfo, updateTempPreview } = statusPreview;
     const { syncPreviewOrientation } = core;
     const { postPresenceSensorEntity, postClockOverlay } = artworkPostApi;
     const { postBrightnessMode, postDisplayBacklightBrightness, postBrightnessDawnTime, postBrightnessDuskTime } = schedulePostApi;
-    const { postClockBar, postClockBarNightMode, postBatteryStatus, postVoiceServices } = clockBarPostApi;
+    const { postClockBar, postClockBarNightMode, postBatteryStatus } = clockBarPostApi;
     const els = runtime.els;
-    const { timezoneOptionsWithFallback, voiceServicesUiState, setVoiceServicesEnabled } = environment;
+    const { timezoneOptionsWithFallback } = environment;
     const { syncUi: syncScreenScheduleUi } = schedule;
     const { syncUi: syncScreensaverTimeoutUi } = screensaverTimeout;
     const { normalize: normalizeScreenRotation, activeOptions: activeScreenRotationOptions, appendOption: appendScreenRotationOption } = screenRotation;
@@ -77,11 +83,61 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
         var config: any = document.createElement("div");
         config.className = "sp-config fade-in";
         var appearBody: any = document.createElement("div");
-        var onColor: any = colorField("sp-set-on-color", WEB_UI_COLORS.primary, function (this: any, hex?: any) {
+        var onColor = createColorSwatches(state.onColor || WEB_UI_COLORS.primary, function (hex) {
+            state.onColor = hex;
+            renderPreview();
             postText(entityName("button_on_color"), hex);
-        });
+        }, "Active colour presets");
+        onColor.id = "sp-set-on-color";
         appearBody.appendChild(onColor);
         els.setOnColor = onColor;
+        var themeModes: any = segmentControl([
+            ["Dark", "Dark"], ["Light", "Light"], ["Auto", "Automatic"],
+        ], normalizeThemeMode(state.themeMode), function (this: any, mode?: any) {
+            state.themeMode = normalizeThemeMode(mode);
+            postSelect(entityName("screen_theme_mode"), state.themeMode);
+            syncThemeSettingsUi(state, runtime);
+            renderPreview();
+        }, "sp-segment sp-segment-scroll sp-theme-mode-segment");
+        themeModes.segment.id = "sp-set-theme-mode";
+        appearBody.appendChild(fieldLabel("Theme"));
+        appearBody.appendChild(themeModes.segment);
+        els.setThemeModeButtons = themeModes.buttons;
+        var themeAutoFields: any = condField();
+        var themeAutoMethods: any = segmentControl([
+            ["Time", "Time"], ["Sunrise / Sunset", "Automatic"],
+        ], normalizeThemeAutoMethod(state.themeAutoMethod), function (this: any, method?: any) {
+            state.themeAutoMethod = normalizeThemeAutoMethod(method);
+            postSelect(entityName("screen_theme_auto_method"), state.themeAutoMethod);
+            syncThemeSettingsUi(state, runtime);
+        });
+        themeAutoMethods.segment.id = "sp-set-theme-auto-method";
+        themeAutoFields.appendChild(fieldLabel("Automatic theme"));
+        themeAutoFields.appendChild(themeAutoMethods.segment);
+        els.setThemeAutoMethodButtons = themeAutoMethods.buttons;
+        var themeSunInfo: any = document.createElement("div");
+        themeSunInfo.className = "sp-sun-info";
+        themeSunInfo.id = "sp-theme-sun-info";
+        themeAutoFields.appendChild(themeSunInfo);
+        els.setThemeSunInfo = themeSunInfo;
+        var themeScheduleFields: any = condField();
+        var themeLightStart: any = createTimeInput("Light from", "sp-set-theme-light-start", state.themeLightStart, "07:00", function (this: any, value?: any) {
+            state.themeLightStart = normalizeTimeOfDay(value, "07:00");
+            postText(entityName("screen_theme_light_start"), state.themeLightStart);
+        });
+        themeScheduleFields.appendChild(themeLightStart.wrap);
+        els.setThemeLightStart = themeLightStart.input;
+        var themeDarkStart: any = createTimeInput("Dark from", "sp-set-theme-dark-start", state.themeDarkStart, "20:00", function (this: any, value?: any) {
+            state.themeDarkStart = normalizeTimeOfDay(value, "20:00");
+            postText(entityName("screen_theme_dark_start"), state.themeDarkStart);
+        });
+        themeScheduleFields.appendChild(themeDarkStart.wrap);
+        els.setThemeDarkStart = themeDarkStart.input;
+        themeAutoFields.appendChild(themeScheduleFields);
+        els.setThemeScheduleFields = themeScheduleFields;
+        appearBody.appendChild(themeAutoFields);
+        els.setThemeAutoFields = themeAutoFields;
+        syncThemeSettingsUi(state, runtime);
         var appearanceResetButton: any = createActionButton("sp-icon-button sp-card-header-action", "", "restore", "Reset colours to defaults");
         appearanceResetButton.title = "Reset colours";
         appearanceResetButton.addEventListener("click", function (this: any, event?: any) {
@@ -278,23 +334,6 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
         syncClockBarUi();
         syncTemperatureUi();
         var clockBarCard: any = makeCollapsibleCard("Clock Bar", clockBarBody, true, clockBarBadge);
-        var voiceServicesCard: any = null;
-        if (voiceServicesUiState().settingsVisible) {
-            var voiceServicesBody: any = document.createElement("div");
-            var voiceServices: any = toggleRow("Voice Services", "sp-set-voice-services", state.voiceServicesOn);
-            voiceServicesBody.appendChild(voiceServices.row);
-            els.setVoiceServicesToggle = voiceServices.input;
-            voiceServices.input.addEventListener("change", function (this: any) {
-                setVoiceServicesEnabled(this.checked);
-                syncClockBarUi();
-                postVoiceServices(state.voiceServicesOn);
-            });
-            var voiceServicesBadge: any = statusBadge("Voice services on");
-            els.setVoiceServicesBadge = voiceServicesBadge;
-            syncClockBarUi();
-            voiceServicesCard = makeCollapsibleCard("Voice Services", voiceServicesBody, true, voiceServicesBadge);
-            els.voiceServicesCard = voiceServicesCard;
-        }
         var batteryStatusCard: any = null;
         if (layout.config.features && layout.config.features.battery) {
             var batteryStatusBody: any = document.createElement("div");
@@ -312,7 +351,6 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
             batteryStatusCard = makeCollapsibleCard("Battery", batteryStatusBody, true, batteryStatusBadge);
             els.batteryStatusCard = batteryStatusCard;
         }
-        var alarmDelayAudioCard: any = buildAlarmDelayAudioSettingsCard();
         var rotationCard: any = null;
         if (layout.config.features && layout.config.features.screenRotation) {
             var rotationBody: any = document.createElement("div");
@@ -415,6 +453,7 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
         els.setClockBrightnessNight = timerClockControls.clockBrightnessNight;
         els.setClockBrightnessNightVal = timerClockControls.clockBrightnessNightVal;
         els.setClockBrightnessField = timerClockControls.brightnessField;
+        els.setClockDateToggle = timerClockControls.dateToggle;
         var coverArtCard: any = buildCoverArtSettingsCard();
         ssBody.appendChild(timerPanel);
         els.setSSTimeout = timeoutSelect;
@@ -497,6 +536,7 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
         els.setSensorClockBrightnessNight = sensorClockControls.clockBrightnessNight;
         els.setSensorClockBrightnessNightVal = sensorClockControls.clockBrightnessNightVal;
         els.setSensorClockBrightnessField = sensorClockControls.brightnessField;
+        els.setSensorClockDateToggle = sensorClockControls.dateToggle;
         syncClockScreensaverControls();
         syncMediaPlayerSleepPreventionUi();
         syncCoverArtScreensaverUi();
@@ -519,7 +559,16 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
         }
         els.setSsMode = setSsMode;
         setSsMode(ssMode);
+        const pinBadge = statusBadge("PIN protection on");
+        pinBadge.className = "sp-card-badge sp-hidden";
+        var screensaverPinCard: any = null;
+        const pinSettings = buildScreensaverPinSettings(document, resetAwareFetch, fields, pinBadge, {
+            onVisibilityChange: visible => { if (screensaverPinCard) screensaverPinCard.hidden = !visible; },
+        });
+        els.syncScreensaverPinUi = pinSettings.refresh;
         var screensaverCard: any = makeCollapsibleCard("Screensaver", ssBody, true, ssBadge);
+        screensaverPinCard = makeCollapsibleCard("Pin Protection", pinSettings.body, true, pinBadge);
+        screensaverPinCard.hidden = pinSettings.body.hidden;
         var idleBody: any = document.createElement("div");
         idleBody.appendChild(fieldLabel("Return Home After"));
         var hsSelect: any = document.createElement("select");
@@ -561,14 +610,11 @@ export function createSettingsPageFeature(codec: Pick<ConfigCodecFeature, "bindT
             clockBarCard,
             rotationCard,
         ]);
-        appendSettingsSection(config, "Voice & Sounds", [
-            voiceServicesCard,
-            alarmDelayAudioCard,
-        ]);
         appendSettingsSection(config, "Sleep & Schedule", [
             coverArtCard,
             screensaverCard,
             scheduleCard,
+            screensaverPinCard,
         ]);
         appendSettingsSection(config, "Preferences", [
             languageCard,

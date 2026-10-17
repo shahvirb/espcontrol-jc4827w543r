@@ -147,8 +147,9 @@ export function createCoreFeature(
         var layout: any = activeLayout();
         var screen: any = layout.screen || applicationLayout.config.screen;
         var scale: any = previewLayoutScale(layout);
+        applicationLayout.previewSlots = layout.slots || applicationLayout.totalSlots;
         applicationLayout.gridCols = layout.cols || applicationLayout.config.cols;
-        applicationLayout.gridRows = layout.rows || Math.ceil(applicationLayout.numSlots / applicationLayout.gridCols);
+        applicationLayout.gridRows = layout.rows || Math.ceil(applicationLayout.previewSlots / applicationLayout.gridCols);
         var r: any = document.documentElement.style;
         r.setProperty("--screen-w", screen.width || applicationLayout.config.screen.width);
         r.setProperty("--screen-aspect", screen.aspect || applicationLayout.config.screen.aspect);
@@ -159,7 +160,7 @@ export function createCoreFeature(
             ? applicationLayout.config.largeSensorUnitOffsetPercent : -10;
         r.setProperty("--large-sensor-unit-offset-y", "calc(var(--btn-icon) * 2.5 * " + (largeSensorUnitOffsetPercent / 100) + ")");
         if (!preservePendingGrid && state.grid && state.grid.length) {
-            normalizeGridSpansForLayout(state.grid, state.sizes, applicationLayout.numSlots, applicationLayout.gridCols, function (this: any, normalizedOrder?: any) {
+            normalizeGridSpansForLayout(state.grid, state.sizes, applicationLayout.previewSlots, applicationLayout.gridCols, function (this: any, normalizedOrder?: any) {
                 if (runtime.orderReceived)
                     postButtonOrder(normalizedOrder);
             });
@@ -170,7 +171,7 @@ export function createCoreFeature(
                 if (!sp || !sp.grid || !sp.grid.length)
                     continue;
                 var previousSubpageOrder: any = JSON.stringify(serializeSubpageGrid(sp));
-                normalizeGridSpansForLayout(sp.grid, sp.sizes, applicationLayout.numSlots, applicationLayout.gridCols);
+                normalizeGridSpansForLayout(sp.grid, sp.sizes, applicationLayout.previewSlots, applicationLayout.gridCols);
                 sp.order = serializeSubpageGrid(sp);
                 if (JSON.stringify(sp.order) !== previousSubpageOrder) {
                     saveSubpage(homeSlot);

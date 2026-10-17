@@ -111,7 +111,6 @@ script:
                                            id(display_time),
                                            id(network_status_button));
           clock_bar_set_widget_hidden(id(night_mode_status_icon), true);
-          ${voice_clock_bar_hide_code}
           ${battery_status_hide_code}
           network_status_hide_modal();
 
@@ -119,6 +118,9 @@ script:
     mode: restart
     then:
       - lambda: |-
+          register_theme_hud(id(temperatures), id(display_time),
+                             id(network_status_icon_label),
+                             id(night_mode_status_icon_label));
           ClockBarVisibility visibility = clock_bar_resolve_visibility(
               id(clock_bar_enabled).state,
               id(main_page)->obj,
@@ -156,7 +158,6 @@ script:
                                              id(display_time),
                                              id(network_status_button));
             clock_bar_set_widget_hidden(id(night_mode_status_icon), true);
-            ${voice_clock_bar_hide_code}
             ${battery_status_hide_code}
             network_status_hide_modal();
             return;
@@ -201,7 +202,6 @@ script:
             lv_obj_add_flag(id(network_status_button), LV_OBJ_FLAG_HIDDEN);
             network_status_hide_modal();
           }
-          ${voice_clock_bar_apply_code}
           ${battery_status_apply_code}
           if (show_night_mode) {
             const int night_mode_box = lv_obj_get_width(id(night_mode_status_icon));
@@ -510,6 +510,21 @@ switch:
       - script.execute: cover_art_playback_refresh
     on_turn_off:
       - script.execute: cover_art_disable
+
+  - platform: template
+    name: "${entity_screen_saver_show_date}"
+    internal: true
+    id: clock_screensaver_show_date
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    icon: "mdi:calendar"
+    entity_category: config
+    web_server:
+      sorting_group_id: sg_screensaver
+    on_turn_on:
+      - script.execute: clock_screensaver_update_time
+    on_turn_off:
+      - script.execute: clock_screensaver_update_time
 
   - platform: template
     name: "${entity_screen_saver_clock_overlay}"

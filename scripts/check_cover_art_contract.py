@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compile and exercise the pure cover-art policy, layout, and state helpers."""
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -143,11 +144,11 @@ int main() {
   assert(!policy_allows_display(p) && !policy_allows_download(p));
   p.hide_external_input = false; p.schedule_blocks = true;
   assert(!policy_allows_display(p) && policy_allows_download(p));
-  p.schedule_blocks = false; p.voice_interaction_active = true; assert(!policy_allows_display(p));
+  p.schedule_blocks = false; p.alarm_takeover_active = true; assert(!policy_allows_display(p));
   assert(feature_allowed(true, true, true, false, false));
   assert(!feature_allowed(true, true, true, true, true));
-  assert(display_allowed(true, true, true, true, false, false, false, false, false));
-  assert(!display_allowed(true, true, true, true, false, false, false, true, false));
+  assert(display_allowed(true, true, true, true, false, false, false, false));
+  assert(!display_allowed(true, true, true, true, false, false, false, true));
   auto ten = cover_art_layout("guition-esp32-p4-jc8012p4a1", "0", 1280, 800, 800, 506);
   assert(ten.split && ten.art_size == 800 && ten.panel_x == 840);
   auto ten_v2 = cover_art_layout("guition-esp32-p4-jc8012p4a1-v2", "90", 800, 1280, 800, 506);
@@ -189,8 +190,19 @@ int main() {
       assert(layout.title_max_lines == 0 && layout.title_max_height == 162);
     }
   }
+  // Both 4.3-inch chip revisions must retain the portrait layout and rotation convention.
+  for (const auto &rotation : {"0", "90", "180", "270"}) {
+    const auto original = cover_art_layout("guition-esp32-p4-jc4880p443", rotation, 480, 800, 480, 130);
+    const auto v3 = cover_art_layout("guition-esp32-p4-jc4880p443-v3", rotation, 480, 800, 480, 130);
+    assert(v3.split && v3.screen_width == original.screen_width && v3.screen_height == original.screen_height);
+    assert(v3.panel_x == original.panel_x && v3.panel_y == original.panel_y);
+    assert(v3.title_max_lines == original.title_max_lines && v3.title_max_height == original.title_max_height);
+    assert(rotation_is_landscape("guition-esp32-p4-jc4880p443-v3", rotation) ==
+           rotation_is_landscape("guition-esp32-p4-jc4880p443", rotation));
+  }
   auto four = cover_art_layout("guition-esp32-p4-jc4880p443", "90", 800, 480, 480, 220);
   assert(four.screen_width == 800);
+  assert(playback_button_layout(four).size == 112);
   // Three 69px title lines leave room for artist and elapsed time above the
   // playback control in both landscape rotations of the 4.3-inch display.
   for (const auto &rotation : {"90", "270"}) {
@@ -209,6 +221,7 @@ int main() {
   }
   auto square = cover_art_layout("esp32-p4-86", "0", 720, 720, 800, 495);
   assert(!square.split && square.art_size == 720 && square.panel_padding == 36);
+  assert(playback_button_layout(square).size == 144);
   for (const auto &slug : {"guition-esp32-s3-4848s040", "esp32-p4-86"}) {
     const bool s3 = std::string(slug) == "guition-esp32-s3-4848s040";
     const int side = s3 ? 480 : 720;
@@ -235,7 +248,7 @@ int main() {
        cover_art_layout("guition-esp32-s3-4848s040", "0", 480, 480, 480, 330),
        cover_art_layout("guition-esp32-p4-jc4880p443", "0", 480, 800, 480, 130)}) {
     const auto button = playback_button_layout(layout);
-    assert(button.size >= 80 && button.size <= 112);
+    assert(button.size >= 80 && button.size <= 144);
     assert(button.panel_width > 0 && button.panel_height > 0 && button.title_max_height > 0);
     const int button_x = layout.screen_width - button.margin - button.size;
     const int button_y = layout.screen_height - button.margin - button.size;
@@ -260,11 +273,11 @@ int main() {
   s.select_source("entity-b"); assert(s.retry_count == 0 && s.refresh_needed);
   s.begin_download("entity-b"); assert(!s.apply_download("entity-a"));
   assert(s.apply_download("entity-b") && s.current_image_loaded());
-  // Rapid play/pause policy changes cannot bypass alarm, voice, schedule, or source filtering.
-  assert(display_allowed(true, true, true, true, false, false, false, false, false));
-  assert(!display_allowed(true, false, true, true, false, false, false, false, false));
-  assert(!display_allowed(true, true, true, false, false, false, false, false, false));
-  assert(!display_allowed(true, true, true, true, false, false, true, false, false));
+  // Rapid play/pause policy changes cannot bypass alarm, schedule, or source filtering.
+  assert(display_allowed(true, true, true, true, false, false, false, false));
+  assert(!display_allowed(true, false, true, true, false, false, false, false));
+  assert(!display_allowed(true, true, true, false, false, false, false, false));
+  assert(!display_allowed(true, true, true, true, false, false, true, false));
   // Rotations remain deterministic when events repeat or arrive after boot.
   auto portrait_again = cover_art_layout("guition-esp32-p4-jc1060p470", "90", 600, 1024, 600, 260);
   auto portrait_repeat = cover_art_layout("guition-esp32-p4-jc1060p470", "90", 600, 1024, 600, 260);
@@ -361,18 +374,11 @@ for required in (
         raise SystemExit(f"P4 artwork job safety contract missing: {required}")
 
 jpeg_decoder = (ROOT / "components" / "artwork_image" / "jpeg_image.cpp").read_text(encoding="utf-8")
-for required in (
-    """if (!this->set_size(target_width, target_height)) {
-      p4_release_jpeg_workspace();
-      return DECODE_ERROR_OUT_OF_MEMORY;
-    }""",
-    """if (!this->set_size(info.width, info.height)) {
-      p4_release_jpeg_workspace();
-      return DECODE_ERROR_OUT_OF_MEMORY;
-    }""",
-):
-    if required not in jpeg_decoder:
-        raise SystemExit("P4 JPEG workspace must be released after image buffer allocation failure")
+# Exercise buffer ownership on success and failure instead of requiring a
+# particular spelling of manual cleanup; the decoder now uses scoped ownership.
+subprocess.run(
+    [sys.executable, str(ROOT / "tests/firmware/p4_jpeg_memory_test.py")], check=True
+)
 
 if 'if (err == ESP_ERR_NOT_SUPPORTED) {' not in jpeg_decoder:
     raise SystemExit("P4 JPEG unsupported-format fallback must be handled explicitly")

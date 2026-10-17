@@ -81,6 +81,7 @@
       "option_select",
       "push",
       "screen_lock",
+      "screensaver",
       "webhook",
       "sensor",
       "subpage",
@@ -154,6 +155,7 @@
       "option_select": {"driver": "option_select", "capabilities": {"informationOnly": false, "subscriptions": true, "actions": true, "numericControl": false, "modal": false, "runtimeAllocation": true, "subpage": true}},
       "push": {"driver": "push", "capabilities": {"informationOnly": false, "subscriptions": false, "actions": true, "numericControl": false, "modal": false, "runtimeAllocation": false, "subpage": true}},
       "screen_lock": {"driver": "screen_lock", "capabilities": {"informationOnly": false, "subscriptions": true, "actions": true, "numericControl": false, "modal": false, "runtimeAllocation": false, "subpage": true}},
+      "screensaver": {"driver": "screensaver", "capabilities": {"informationOnly": false, "subscriptions": false, "actions": true, "numericControl": false, "modal": false, "runtimeAllocation": false, "subpage": true}},
       "webhook": {"driver": "webhook", "capabilities": {"informationOnly": false, "subscriptions": true, "actions": true, "numericControl": false, "modal": false, "runtimeAllocation": false, "subpage": true}},
       "sensor": {"driver": "sensor", "capabilities": {"informationOnly": true, "subscriptions": true, "actions": false, "numericControl": false, "modal": false, "runtimeAllocation": true, "subpage": true}},
       "local_sensor": {"driver": "sensor", "capabilities": {"informationOnly": true, "subscriptions": true, "actions": false, "numericControl": false, "modal": false, "runtimeAllocation": false, "subpage": true}},
@@ -726,6 +728,12 @@
           "label": "Large Clock",
           "kind": "flag",
           "omitDefault": true
+        },
+        {
+          "name": "center_clock",
+          "label": "Center Clock",
+          "kind": "flag",
+          "omitDefault": true
         }
       ],
       "normalization": {
@@ -741,7 +749,7 @@
           "options": { "policy": "hook", "hook": "normalize_date_time_options" }
         },
         "unknownOptions": "drop",
-        "canonicalOptionOrder": ["large_numbers"],
+        "canonicalOptionOrder": ["large_numbers", "center_clock"],
         "optionHook": "normalize_date_time_options"
       },
       "default": {
@@ -869,7 +877,7 @@
           "name": "climate_tabs",
           "label": "Visible Tabs",
           "kind": "text",
-          "defaultValue": "temperature|mode|preset|fan|swing",
+          "defaultValue": "temperature|mode|preset|fan|swing|horizontal_swing",
           "omitDefault": true
         }
       ],
@@ -1740,6 +1748,40 @@
           ]
         },
         {
+          "name": "power_entity",
+          "label": "Power Entity",
+          "kind": "text",
+          "omitDefault": true,
+          "applicability": [
+            { "source": "field", "name": "sensor", "operator": "in", "value": ["control_modal", "cover_art"] }
+          ]
+        },
+        {
+          "name": "media_tabs",
+          "label": "Modal Tabs",
+          "kind": "text",
+          "values": [
+            "controls",
+            "progress",
+            "volume",
+            "speakers",
+            "power"
+          ],
+          "defaultValue": "controls|progress|volume|speakers",
+          "omitDefault": true,
+          "applicability": [
+            {
+              "source": "field",
+              "name": "sensor",
+              "operator": "in",
+              "value": [
+                "control_modal",
+                "cover_art"
+              ]
+            }
+          ]
+        },
+        {
           "name": "label_display",
           "label": "Label Display",
           "kind": "choice",
@@ -1814,7 +1856,7 @@
           "options": { "policy": "hook", "hook": "normalize_media_options" }
         },
         "unknownOptions": "drop",
-        "canonicalOptionOrder": ["label_display", "number_display", "cover_art_details", "cover_art_secondary_entity", "speaker_group_entity", "volume_max", "playlist_content_id", "playlist_content_type", "playlist_player_source", "large_numbers"],
+        "canonicalOptionOrder": ["label_display", "number_display", "cover_art_details", "cover_art_secondary_entity", "speaker_group_entity", "power_entity", "media_tabs", "volume_max", "playlist_content_id", "playlist_content_type", "playlist_player_source", "large_numbers"],
         "optionHook": "normalize_media_options"
       },
       "behavior": {
@@ -1897,10 +1939,65 @@
         "options": ""
       }
     },
+    "screensaver": {
+      "label": "Screensaver",
+      "allowInSubpage": true,
+      "domains": [],
+      "normalization": {
+        "fields": {
+          "entity": {
+            "policy": "clear"
+          },
+          "label": {
+            "policy": "clear"
+          },
+          "icon": {
+            "policy": "default",
+            "value": "Monitor"
+          },
+          "icon_on": {
+            "policy": "default",
+            "value": "Auto"
+          },
+          "sensor": {
+            "policy": "clear"
+          },
+          "unit": {
+            "policy": "clear"
+          },
+          "type": {
+            "policy": "default",
+            "value": "screensaver"
+          },
+          "precision": {
+            "policy": "clear"
+          },
+          "options": {
+            "policy": "clear"
+          }
+        },
+        "unknownOptions": "drop",
+        "canonicalOptionOrder": []
+      },
+      "default": {
+        "entity": "",
+        "label": "",
+        "icon": "Monitor",
+        "icon_on": "Auto",
+        "sensor": "",
+        "unit": "",
+        "type": "screensaver",
+        "precision": "",
+        "options": ""
+      }
+    },
     "screen_lock": {
       "label": "Screen Lock",
       "allowInSubpage": true,
       "domains": [],
+      "options": [
+        { "name": "screensaver_on_lock", "label": "Screensaver on lock", "kind": "flag", "omitDefault": true }
+      ],
       "normalization": {
         "fields": {
           "entity": { "policy": "clear" },
@@ -1911,10 +2008,10 @@
           "unit": { "policy": "clear" },
           "type": { "policy": "default", "value": "screen_lock" },
           "precision": { "policy": "clear" },
-          "options": { "policy": "clear" }
+          "options": { "policy": "keep" }
         },
         "unknownOptions": "drop",
-        "canonicalOptionOrder": []
+        "canonicalOptionOrder": ["screensaver_on_lock"]
       },
       "default": {
         "entity": "",
@@ -2305,7 +2402,10 @@
     "image": {
       "label": "Camera Card",
       "allowInSubpage": true,
-      "domains": ["camera", "image"],
+      "domains": [
+        "camera",
+        "image"
+      ],
       "options": [
         {
           "name": "image_label",
@@ -2321,27 +2421,90 @@
         },
         {
           "name": "image_modal_mode",
-          "label": "Expanded Image",
+          "label": "Image fit",
           "kind": "choice",
-          "values": ["fill", "fit"],
+          "values": [
+            "fill",
+            "fit"
+          ],
           "defaultValue": "fill",
+          "omitDefault": true
+        },
+        {
+          "name": "image_modal_refresh_mode",
+          "label": "Camera refresh",
+          "kind": "choice",
+          "values": [
+            "off",
+            "periodic",
+            "activity"
+          ],
+          "defaultValue": "off",
+          "omitDefault": true
+        },
+        {
+          "name": "image_modal_refresh_interval",
+          "label": "Refresh interval",
+          "kind": "choice",
+          "values": [
+            "5",
+            "10",
+            "30"
+          ],
+          "defaultValue": "10",
+          "omitDefault": true
+        },
+        {
+          "name": "image_modal_refresh_trigger",
+          "label": "Trigger entity",
+          "kind": "text",
           "omitDefault": true
         }
       ],
       "normalization": {
         "fields": {
-          "entity": { "policy": "keep" },
-          "label": { "policy": "hook", "hook": "normalize_image_fields" },
-          "icon": { "policy": "hook", "hook": "normalize_image_fields" },
-          "icon_on": { "policy": "default", "value": "Auto" },
-          "sensor": { "policy": "clear" },
-          "unit": { "policy": "clear" },
-          "type": { "policy": "default", "value": "image" },
-          "precision": { "policy": "clear" },
-          "options": { "policy": "hook", "hook": "normalize_image_options" }
+          "entity": {
+            "policy": "keep"
+          },
+          "label": {
+            "policy": "hook",
+            "hook": "normalize_image_fields"
+          },
+          "icon": {
+            "policy": "hook",
+            "hook": "normalize_image_fields"
+          },
+          "icon_on": {
+            "policy": "default",
+            "value": "Auto"
+          },
+          "sensor": {
+            "policy": "clear"
+          },
+          "unit": {
+            "policy": "clear"
+          },
+          "type": {
+            "policy": "default",
+            "value": "image"
+          },
+          "precision": {
+            "policy": "clear"
+          },
+          "options": {
+            "policy": "hook",
+            "hook": "normalize_image_options"
+          }
         },
         "unknownOptions": "drop",
-        "canonicalOptionOrder": ["image_label", "image_icon", "image_modal_mode"],
+        "canonicalOptionOrder": [
+          "image_label",
+          "image_icon",
+          "image_modal_mode",
+          "image_modal_refresh_mode",
+          "image_modal_refresh_interval",
+          "image_modal_refresh_trigger"
+        ],
         "optionHook": "normalize_image_options"
       },
       "default": {
@@ -2631,6 +2794,7 @@
     "climate_control": "HC",
     "push": "P",
     "screen_lock": "SL",
+    "screensaver": "SS",
     "webhook": "WH",
     "internal": "I",
     "subpage": "G"
