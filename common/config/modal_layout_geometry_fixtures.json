@@ -110,6 +110,71 @@
         "tabs": {"size": 48, "selectedSize": 54, "gap": 12, "frameWidth": 306, "frameHeight": 66, "safeLeft": 73, "rowLeft": 82, "contentGap": 16, "iconZoom": 180},
         "content": {"top": 100, "bottom": 418, "width": 434, "height": 318, "centerY": 41}
       }
+    },
+    {
+      "slug": "guition-jc4827w543r",
+      "profile": {
+        "family": "compact-square",
+        "density": "compact",
+        "memoryTier": "constrained",
+        "baseTouchTarget": 46
+      },
+      "viewport": {"width": 480, "height": 272},
+      "panelInsets": {"left": 5, "top": 30, "right": 5, "bottom": 4},
+      "compactPanelInsets": {"left": 5, "top": 4, "right": 5, "bottom": 4},
+      "coverage": {
+        "rotations": ["0", "90", "180", "270"],
+        "mediaTabCounts": [1, 2, 3, 4, 5],
+        "climateTabCounts": [1, 2, 3, 4, 5, 6],
+        "standaloneTabCount": 0,
+        "scrollableMinimumHeight": 76,
+        "enforceTabTouchTarget": true
+      },
+      "expected": {
+        "panel": {"x": 5, "y": 30, "width": 470, "height": 238},
+        "shortSide": 272,
+        "inset": 10,
+        "back": {"size": 26, "x": 10, "y": 10},
+        "buttonSize": 45,
+        "arc": {"size": 202, "stroke": 9, "centerX": 0},
+        "controlsCenterY": 81,
+        "tabs": {"size": 48, "selectedSize": 54, "gap": 12, "frameWidth": 306, "frameHeight": 66, "safeLeft": 41, "rowLeft": 82, "contentGap": 16, "iconZoom": 180},
+        "content": {"top": 92, "bottom": 228, "width": 450, "height": 119, "centerY": 32},
+        "speakerContent": {"top": 92, "bottom": 228, "width": 450, "height": 119, "centerY": 32},
+        "fallbackHeight": 119
+      },
+      "compactSnapshot": {
+        "panel": {"x": 5, "y": 4, "width": 470, "height": 264},
+        "back": {"size": 26, "x": 10, "y": 10},
+        "tabs": {"size": 48, "selectedSize": 54, "gap": 12, "frameWidth": 306, "frameHeight": 66, "safeLeft": 41, "rowLeft": 82, "contentGap": 16},
+        "content": {"top": 92, "bottom": 254, "width": 450, "height": 162, "centerY": 41},
+        "speakerContent": {"top": 92, "bottom": 254, "width": 450, "height": 132, "centerY": 26},
+        "fallbackHeight": 132,
+        "arcSize": 228,
+        "controlsCenterY": 94
+      },
+      "rotatedSnapshot": {
+        "normal": {
+          "panel": {"x": 5, "y": 30, "width": 262, "height": 446},
+          "back": {"size": 26, "x": 10, "y": 10},
+          "arcSize": 242,
+          "controlsCenterY": 101,
+          "tabs": {"size": 48, "selectedSize": 54, "gap": 12, "frameWidth": 306, "frameHeight": 66, "safeLeft": 41, "rowLeft": 41, "contentGap": 16},
+          "content": {"top": 92, "bottom": 436, "width": 242, "height": 344, "centerY": 41},
+          "speakerContent": {"top": 92, "bottom": 436, "width": 242, "height": 344, "centerY": 41},
+          "fallbackHeight": 223
+        },
+        "compact": {
+          "panel": {"x": 5, "y": 4, "width": 262, "height": 472},
+          "back": {"size": 26, "x": 10, "y": 10},
+          "arcSize": 242,
+          "controlsCenterY": 101,
+          "tabs": {"size": 48, "selectedSize": 54, "gap": 12, "frameWidth": 306, "frameHeight": 66, "safeLeft": 41, "rowLeft": 41, "contentGap": 16},
+          "content": {"top": 92, "bottom": 462, "width": 242, "height": 370, "centerY": 41},
+          "speakerContent": {"top": 92, "bottom": 462, "width": 242, "height": 370, "centerY": 41},
+          "fallbackHeight": 236
+        }
+      }
     }
   ]
 }
