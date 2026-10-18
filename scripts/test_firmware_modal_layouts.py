@@ -58,17 +58,25 @@ class FirmwareModalLayoutContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, message):
                     checker.check_fixture_schema(fixtures)
 
-    def test_diagnostics_aggregate_known_defects_and_return_nonzero(self) -> None:
+    def test_mutated_scrollable_contract_is_reported_as_usability_failure(self) -> None:
+        fixtures = copy.deepcopy(self.fixtures)
+        jc = next(entry for entry in fixtures["layouts"] if entry["slug"] == "guition-jc4827w543r")
+        # Deliberately make the contract impossible. This exercises the
+        # diagnostic path without depending on any currently known production
+        # Back-target or rotated-tab failures remaining unfixed.
+        jc["coverage"]["scrollableMinimumHeight"] = 10_000
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            result = checker.compile_layout_contract(self.fixtures)
+            result = checker.compile_layout_contract(fixtures)
 
         text = output.getvalue()
         self.assertNotEqual(result, 0)
-        self.assertIn("SNAPSHOT PASS (395 checks, 0 failures)", text)
-        self.assertIn("USABILITY FAIL (1263 checks, 33 failures)", text)
-        self.assertIn("normal rotation 90 media 4 tabs row fits panel", text)
-        self.assertIn("compact rotation 270 climate 6 tabs row fits panel", text)
+        self.assertIn(
+            "USABILITY FAIL: guition-jc4827w543r normal rotation 0 media speaker content "
+            "scrollable row minimum",
+            text,
+        )
+        self.assertIn("USABILITY FAIL", text)
 
     def test_mutated_snapshot_is_reported_as_snapshot_failure(self) -> None:
         fixtures = copy.deepcopy(self.fixtures)
